@@ -10,10 +10,11 @@ import plotly.graph_objects as go
 from plotly.subplots import make_subplots
 import warnings
 
-# --- BULLETPROOF AI IMPORTS ---
+# --- BULLETPROOF AI IMPORTS (Now with SHAP) ---
 try:
     from xgboost import XGBRegressor
     from sklearn.metrics import mean_squared_error
+    import shap
     HAS_ML = True
 except ImportError:
     HAS_ML = False
@@ -72,6 +73,8 @@ hr{{border:none!important;height:1px!important;background:linear-gradient(90deg,
 ::-webkit-scrollbar{{width:4px;height:4px}}::-webkit-scrollbar-track{{background:var(--bg)}}::-webkit-scrollbar-thumb{{background:var(--t3);border-radius:2px}}
 details{{background:var(--s1)!important;border:1px solid var(--b1)!important;border-radius:var(--r)!important}}
 details summary{{color:var(--t1)!important;font-weight:600!important}}
+/* Make sure selectboxes fit the dark theme */
+div[data-baseweb="select"] > div {{background: var(--s1); border-color: var(--b1); color: #fff;}}
 </style>""", unsafe_allow_html=True)
 
 def _u(s): return f"data:image/svg+xml;base64,{base64.b64encode(s.encode()).decode()}"
@@ -151,50 +154,67 @@ def compute_dqi(r1,r2,daily_burn,drift,chrono_bad,mgo_neg):
     return min(100,max(0,round(math.exp(log_sum)*100,0)))
 
 # ═══════════════════════════════════════════════════════════════════════════════
-# AI DIGITAL TWIN MODULE (v16.0: XGBOOST + CONTINUOUS MASS) - BULLETPROOF
+# AI DIGITAL TWIN MODULE (v17.1: XGBOOST + SHAP EXPLAINER)
 # ═══════════════════════════════════════════════════════════════════════════════
 @st.cache_data(show_spinner=False)
 def calculate_stochastic_variance(trip_df):
+    zeros_df = pd.DataFrame({'Stoch_Var':[0.0]*len(trip_df), 'SHAP_Base':[0.0]*len(trip_df), 'SHAP_Speed':[0.0]*len(trip_df), 'SHAP_Cargo':[0.0]*len(trip_df), 'SHAP_Route':[0.0]*len(trip_df)}, index=trip_df.index)
     try:
-        # Failsafe: If XGBoost failed to import, return 0s so the app stays alive.
-        if not HAS_ML or trip_df.empty: 
-            return pd.Series([0.0]*len(trip_df), index=trip_df.index)
+        # Failsafe 1: Is XGBoost/SHAP installed?
+        if not HAS_ML:
+            st.warning("AI ENGINE OFFLINE: XGBoost or SHAP is not installed in the terminal.")
+            return zeros_df
+            
+        if trip_df.empty: 
+            return zeros_df
             
         ml = trip_df[['Speed_kn','CargoQty','Route','Daily_Burn','Days']].copy()
         
-        # Bulletproof Data Cleaning for Continuous Mass
         ml['Speed_kn'] = ml['Speed_kn'].fillna(12.0)
         ml['CargoQty'] = ml['CargoQty'].replace(0, np.nan).ffill().fillna(0)
         ml['Route_Code'] = ml['Route'].astype('category').cat.codes
         
         train = ml[ml['Daily_Burn'] > 0]
         
+        # Failsafe 2: Do we have enough data?
         if len(train) < 5: 
-            return pd.Series([0.0]*len(trip_df), index=trip_df.index)
+            return zeros_df
             
         X_train = train[['Speed_kn','CargoQty','Route_Code']]
         y_train = train['Daily_Burn']
         
-        # Kaggle-Tier XGBoost implementation
         ai_model = XGBRegressor(n_estimators=150, learning_rate=0.05, max_depth=5, random_state=42, objective='reg:squarederror')
         ai_model.fit(X_train, y_train)
         
         predictions = ai_model.predict(X_train)
         route_noise = np.sqrt(mean_squared_error(y_train, predictions))
-        route_noise = min(4.0, max(0.3, route_noise)) # Strict clamping
+        route_noise = min(4.0, max(0.3, route_noise)) 
         
         X_all = ml[['Speed_kn','CargoQty','Route_Code']]
         baseline_prediction = ai_model.predict(X_all)
+        
+        # --- SHAP INJECTION ---
+        explainer = shap.TreeExplainer(ai_model)
+        shap_vals = explainer.shap_values(X_all)
+        base_val = explainer.expected_value
+        if isinstance(base_val, np.ndarray): base_val = base_val[0]
         
         np.random.seed(42)
         stochastic_reality = baseline_prediction + np.random.normal(loc=0, scale=route_noise, size=len(trip_df))
         
         variance_result = (ml['Daily_Burn'] - stochastic_reality) * ml['Days']
-        return variance_result.round(1)
+        
+        return pd.DataFrame({
+            'Stoch_Var': variance_result.round(1),
+            'SHAP_Base': [base_val] * len(X_all),
+            'SHAP_Speed': shap_vals[:, 0],
+            'SHAP_Cargo': shap_vals[:, 1],
+            'SHAP_Route': shap_vals[:, 2]
+        }, index=trip_df.index)
         
     except Exception as e: 
-        # Ultimate fail-safe
-        return pd.Series([0.0]*len(trip_df), index=trip_df.index)
+        st.error(f"AI ENGINE CRASHED: {str(e)}")
+        return zeros_df
 
 @st.cache_data(show_spinner=False)
 def process_file(uploaded_file):
@@ -304,7 +324,6 @@ def process_file(uploaded_file):
         if mgo_neg: flags.append('MGO_NEG')
         if bunk_disc>50: flags.append(f'BUNK_DISC:{bunk_disc:.0f}')
         
-        # NOTE: CargoQty explicitly added to the output dict for the AI to read
         trips.append({'Indicator':ICONS.get(status,ICONS['VERIFIED']),'Timeline':f"{r1['Datetime'].strftime('%d %b %y')}  →  {r2['Datetime'].strftime('%d %b %y')}",'Phase':phase,'Condition':condition,'CargoQty':qty,'Route':f"{port_dep}  →  {port_arr}",'Days':round(days,2),'Dist_NM':round(leg_nm,0),'Speed_kn':round(speed,1),'HFO_MT':round(hfo_c,1),'MGO_MT':round(mgo_c,1),'Fuel_MT':round(total_fuel,1),'Daily_Burn':round(daily_burn,1),'MELO_L':round(melo_c,0),'CYLO_L':round(hsc_c+lsc_c,0),'GELO_L':round(gelo_c,0),'Drift_MT':round(drift,1),'DQI':int(dqi),'Status':status,'Voy':str(r1['Voy']).strip(),'Flags':','.join(flags) if flags else ''})
         
     trip_df=pd.DataFrame(trips)
@@ -318,9 +337,11 @@ def process_file(uploaded_file):
                     mask=(trip_df['Status']=='VERIFIED')&(trip_df['Daily_Burn']>0)&(trip_df['Condition']==cond)&((trip_df['Daily_Burn']<lo)|(trip_df['Daily_Burn']>hi))
                     trip_df.loc[mask,'Status']='STAT OUTLIER'; trip_df.loc[mask,'Indicator']=ICONS['STAT OUTLIER']
                     
-    # Initialize Stoch_Var execution
+    # Initialize Stoch_Var & SHAP execution
     if not trip_df.empty:
-        trip_df['Stoch_Var'] = calculate_stochastic_variance(trip_df)
+        ai_df = calculate_stochastic_variance(trip_df)
+        for col in ai_df.columns: trip_df[col] = ai_df[col]
+        
         cols=list(trip_df.columns)
         if 'Stoch_Var' in cols and 'DQI' in cols:
             cols.insert(cols.index('DQI'),cols.pop(cols.index('Stoch_Var')))
@@ -379,7 +400,7 @@ def chart_voyage(df):
     fig.update_layout(**_BL,title='Fuel by Commercial Voyage (L = legs)',yaxis=dict(title='MT',**_AX),xaxis=dict(title='Voyage',**_AX)); return fig
 
 st.markdown(f"""
-<div class="hero"><div class="hero-left"><img src="data:image/svg+xml;base64,{_LOGO}" class="hero-logo" alt=""/><div><div class="hero-title">POSEIDON TITAN</div><div class="hero-sub">Fleet Consumables Intelligence Engine</div></div></div><div class="hero-badge"><span>KERNEL</span>&ensp;XGBoost + Continuous Mass<br><span>PIPELINE</span>&ensp;D-to-D Immutable Ledger<br><span>BUILD</span>&ensp;v16.0 God Mode</div></div>""",unsafe_allow_html=True)
+<div class="hero"><div class="hero-left"><img src="data:image/svg+xml;base64,{_LOGO}" class="hero-logo" alt=""/><div><div class="hero-title">POSEIDON TITAN</div><div class="hero-sub">Fleet Consumables Intelligence Engine</div></div></div><div class="hero-badge"><span>KERNEL</span>&ensp;XGBoost + Continuous Mass<br><span>PIPELINE</span>&ensp;D-to-D Immutable Ledger<br><span>BUILD</span>&ensp;v17.1 God Mode</div></div>""",unsafe_allow_html=True)
 
 uploaded_files=st.file_uploader('Upload vessel telemetry',accept_multiple_files=True,type=['xlsx','csv'],label_visibility='collapsed')
 
@@ -427,10 +448,11 @@ for f in uploaded_files:
         if summary['outlier']: ap.append(f"{summary['outlier']} outlier")
         cols[5].metric('Anomalies',' / '.join(ap) if ap else '0')
 
-        tab1,tab2,tab3,tab4,tab5=st.tabs(['AUDIT MATRIX','FUEL ANALYTICS','DRIFT TRAJECTORY','LUBE OIL','FORENSIC DETAIL'])
+        # --- TAB 6 INJECTED HERE ---
+        tab1, tab2, tab3, tab4, tab5, tab6 = st.tabs(['AUDIT MATRIX', 'FUEL ANALYTICS', 'DRIFT TRAJECTORY', 'LUBE OIL', 'FORENSIC DETAIL', 'AI EXPLAINER (SHAP)'])
 
         with tab1:
-            dcfg={'Indicator':st.column_config.ImageColumn(' ',width='small'),'Timeline':st.column_config.TextColumn('TIMELINE',width='medium'),'Phase':st.column_config.TextColumn('PH',width='small'),'Condition':st.column_config.TextColumn('COND',width='small'),'Route':st.column_config.TextColumn('ROUTE',width='large'),'Days':st.column_config.NumberColumn('DAYS',format='%.2f'),'Dist_NM':st.column_config.NumberColumn('DIST',format='%d'),'Speed_kn':st.column_config.NumberColumn('SPD',format='%.1f'),'HFO_MT':st.column_config.NumberColumn('HFO',format='%.1f'),'MGO_MT':st.column_config.NumberColumn('MGO',format='%.1f'),'Fuel_MT':st.column_config.NumberColumn('FUEL',format='%.1f'),'Daily_Burn':st.column_config.ProgressColumn('BURN',format='%.1f',min_value=0,max_value=float(max(df['Daily_Burn'].max()*1.15,1))),'MELO_L':st.column_config.NumberColumn('MELO',format='%d'),'CYLO_L':st.column_config.NumberColumn('CYLO',format='%d'),'GELO_L':st.column_config.NumberColumn('GELO',format='%d'),'Stoch_Var':st.column_config.NumberColumn('STOCH VAR',format='%.1f'),'DQI':st.column_config.ProgressColumn('DQI',format='%d',min_value=0,max_value=100),'Status':st.column_config.TextColumn('STATUS',width='medium'),'Flags':st.column_config.TextColumn('FLAGS',width='medium'),'Voy':None, 'CargoQty':None}
+            dcfg={'Indicator':st.column_config.ImageColumn(' ',width='small'),'Timeline':st.column_config.TextColumn('TIMELINE',width='medium'),'Phase':st.column_config.TextColumn('PH',width='small'),'Condition':st.column_config.TextColumn('COND',width='small'),'Route':st.column_config.TextColumn('ROUTE',width='large'),'Days':st.column_config.NumberColumn('DAYS',format='%.2f'),'Dist_NM':st.column_config.NumberColumn('DIST',format='%d'),'Speed_kn':st.column_config.NumberColumn('SPD',format='%.1f'),'HFO_MT':st.column_config.NumberColumn('HFO',format='%.1f'),'MGO_MT':st.column_config.NumberColumn('MGO',format='%.1f'),'Fuel_MT':st.column_config.NumberColumn('FUEL',format='%.1f'),'Daily_Burn':st.column_config.ProgressColumn('BURN',format='%.1f',min_value=0,max_value=float(max(df['Daily_Burn'].max()*1.15,1))),'MELO_L':st.column_config.NumberColumn('MELO',format='%d'),'CYLO_L':st.column_config.NumberColumn('CYLO',format='%d'),'GELO_L':st.column_config.NumberColumn('GELO',format='%d'),'Stoch_Var':st.column_config.NumberColumn('STOCH VAR',format='%.1f'),'DQI':st.column_config.ProgressColumn('DQI',format='%d',min_value=0,max_value=100),'Status':st.column_config.TextColumn('STATUS',width='medium'),'Flags':st.column_config.TextColumn('FLAGS',width='medium'),'Voy':None, 'CargoQty':None, 'SHAP_Base':None, 'SHAP_Speed':None, 'SHAP_Cargo':None, 'SHAP_Route':None}
             st.dataframe(df,column_config=dcfg,hide_index=True,use_container_width=True,height=min(500,38+len(df)*35))
             buf=io.BytesIO(); exp=df.drop(columns=['Indicator'],errors='ignore')
             with pd.ExcelWriter(buf,engine='openpyxl') as w: exp.to_excel(w,index=False,sheet_name='Audit')
@@ -464,6 +486,57 @@ for f in uploaded_files:
                     ai_v=row.get('Stoch_Var',0.0)
                     dm={'GHOST BUNKER':f"Net fuel = {row['Fuel_MT']:.1f} MT (negative) — unrecorded bunkering ~{abs(row['Fuel_MT']):.0f} MT. DQI: {row['DQI']}%.{fl}",'LEDGER VARIANCE':f"XGBoost Stochastic Variance: {ai_v:.1f} MT exceeded threshold. DQI: {row['DQI']}%. {row['Condition']} leg, {row['Days']:.1f}d.{fl}",'STAT OUTLIER':f"Burn {row['Daily_Burn']:.1f} MT/d outside {row['Condition']} IQR fence. Stoch Var: {ai_v:.1f} MT. DQI: {row['DQI']}%.{fl}"}
                     st.markdown(f'<div class="acard" style="border:1px solid rgba({ri[0]},{ri[1]},{ri[2]},.12);border-left:3px solid {sc}"><div style="display:flex;justify-content:space-between;align-items:center"><div><span style="color:{sc};font-weight:700;font-size:.7rem;letter-spacing:.08em;font-family:var(--fm)">{s}</span><span style="color:var(--t3);font-size:.7rem;margin-left:10px;font-family:var(--fm)">{row["Timeline"]}</span></div><span style="color:var(--t2);font-size:.68rem;font-family:var(--fb)">{row["Route"]}</span></div><div style="color:var(--t2);font-size:.7rem;margin-top:8px;line-height:1.6;font-family:var(--fb)">{dm.get(s,"")}</div></div>',unsafe_allow_html=True)
+                    
+        # --- NEW SHAP EXPLAINER TAB ---
+        with tab6:
+            st.markdown('<h3 style="color:#fff;font-family:var(--fd);font-size:1.2rem;margin-bottom:10px;margin-top:10px">Neural Logic Extraction</h3>', unsafe_allow_html=True)
+            
+            # Did the AI actually run, or did it return zeros because of bad data?
+            shap_ran = df['SHAP_Base'].abs().sum() > 0 if 'SHAP_Base' in df.columns else False
+            
+            if not shap_ran:
+                st.warning("⚠️ **AI EXPLAINABILITY OFFLINE:** The XGBoost engine did not generate neural logic for this dataset. This usually happens if the uploaded file has fewer than 5 valid sea-passages, which prevents the AI from learning the complex physics curve of the hull.")
+            else:
+                anomalies = df[df['Status'] != 'VERIFIED']
+                
+                # If there are anomalies, select from them. Otherwise, select from any leg.
+                if anomalies.empty:
+                    st.success("No anomalies detected, but you can still view the AI's logic for any valid leg below.")
+                    options = df['Timeline'].tolist()
+                    sel_time = st.selectbox("Select Voyage Leg", options)
+                    target_row = df[df['Timeline'] == sel_time].iloc[0]
+                else:
+                    st.write("Select a flagged anomaly below to view the exact mathematical receipt of why the AI expects a different fuel burn.")
+                    options = anomalies['Timeline'].tolist()
+                    sel_time = st.selectbox("Select Flagged Anomaly", options)
+                    target_row = anomalies[anomalies['Timeline'] == sel_time].iloc[0]
+                
+                # Build the dynamic Waterfall chart
+                expected = target_row['SHAP_Base'] + target_row['SHAP_Speed'] + target_row['SHAP_Cargo'] + target_row['SHAP_Route']
+                
+                fig = go.Figure(go.Waterfall(
+                    name="SHAP", orientation="v",
+                    measure=["absolute", "relative", "relative", "relative", "total"],
+                    x=["Fleet Baseline", "Speed Impact", "Cargo Impact", "Route Impact", "AI Expected Burn"],
+                    textposition="outside",
+                    text=[f"{target_row['SHAP_Base']:.1f}", f"{target_row['SHAP_Speed']:+.1f}", f"{target_row['SHAP_Cargo']:+.1f}", f"{target_row['SHAP_Route']:+.1f}", f"{expected:.1f}"],
+                    y=[target_row['SHAP_Base'], target_row['SHAP_Speed'], target_row['SHAP_Cargo'], target_row['SHAP_Route'], 0],
+                    connector={"line":{"color":"rgba(201,168,76,0.15)"}},
+                    decreasing={"marker":{"color":"#00e0b0"}},
+                    increasing={"marker":{"color":"#e63946"}},
+                    totals={"marker":{"color":"#7b68ee"}}
+                ))
+                fig.update_layout(
+                    paper_bgcolor='rgba(0,0,0,0)', plot_bgcolor='rgba(0,0,0,0)', 
+                    height=380, margin=dict(t=40, b=20, l=0, r=0),
+                    title=dict(text=f"Mathematical Derivation: {target_row['Route']} ({sel_time})", font=dict(color='#dce8f0', size=14)),
+                    yaxis=dict(title='Metric Tons (MT)', gridcolor='rgba(201,168,76,0.04)', zerolinecolor='rgba(201,168,76,0.06)')
+                )
+                st.plotly_chart(fig, use_container_width=True, config={'displayModeBar':False})
+                
+                # The Translation
+                st.info(f"**Forensic Translation:** The AI determined the baseline burn for this ship is **{target_row['SHAP_Base']:.1f} MT**. The specific speed of {target_row['Speed_kn']}kn altered the burn by **{target_row['SHAP_Speed']:+.1f} MT**, the cargo weight of {target_row['CargoQty']} MT altered it by **{target_row['SHAP_Cargo']:+.1f} MT**, and the oceanography of the route altered it by **{target_row['SHAP_Route']:+.1f} MT**. \n\nThe final expected burn was **{expected:.1f} MT**. The Chief Engineer reported **{target_row['Daily_Burn']:.1f} MT**.")
+
         st.divider()
     except Exception:
         st.error(f'Failed: {f.name}')
