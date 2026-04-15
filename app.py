@@ -10,7 +10,7 @@ import plotly.graph_objects as go
 from plotly.subplots import make_subplots
 import warnings
 
-# --- BULLETPROOF AI IMPORTS (v21.1: 5-Pillar Limit Break Architecture - Sequenced) ---
+# --- BULLETPROOF AI IMPORTS (v21.2: Cache-Breaker Architecture) ---
 try:
     from xgboost import XGBRegressor
     from sklearn.metrics import mean_squared_error
@@ -152,7 +152,7 @@ def compute_dqi(r1,r2,daily_burn,drift,chrono_bad,mgo_neg):
     return min(100,max(0,round(math.exp(log_sum)*100,0)))
 
 # ═══════════════════════════════════════════════════════════════════════════════
-# AI DIGITAL TWIN MODULE (v21.1: 5-PILLAR LIMIT BREAK ARCHITECTURE)
+# AI DIGITAL TWIN MODULE (v21.2: BULLETPROOF CACHE BREAKER)
 # ═══════════════════════════════════════════════════════════════════════════════
 @st.cache_data(show_spinner=False)
 def calculate_stochastic_variance(trip_df):
@@ -167,14 +167,12 @@ def calculate_stochastic_variance(trip_df):
             
         ml = trip_df[['Speed_kn', 'CargoQty', 'Condition', 'Route', 'Daily_Burn', 'Days', 'Date_Start', 'Dist_NM']].copy()
         
-        # 1. KINEMATIC WEATHER EXTRACTION (Pillar 4)
+        # 1. KINEMATIC WEATHER EXTRACTION
         ml['SOG_kn'] = ml['Dist_NM'] / np.maximum(ml['Days'] * 24, 0.1)
-        ml['Kinematic_Delta'] = ml['Speed_kn'] - ml['SOG_kn'] # Positive means fighting headwind/current
+        ml['Kinematic_Delta'] = ml['Speed_kn'] - ml['SOG_kn']
         
-        # 2. ALGORITHMIC EPOCH DETECTION (Pillar 1)
-        # Approximate Admiralty Coefficient: (Disp^(2/3) * V^3) / Fuel. Using Cargo + Base Weight as proxy.
+        # 2. ALGORITHMIC EPOCH DETECTION
         ml['Admiralty_Proxy'] = ((ml['CargoQty'] + 10000)**(2/3) * ml['Speed_kn']**3) / np.maximum(ml['Daily_Burn'], 1)
-        # Smoothing to find structural breaks (CUSUM style)
         smoothed = ml['Admiralty_Proxy'].rolling(window=15, min_periods=1).mean()
         diffs = smoothed.diff().abs()
         break_idx = diffs.idxmax() if not diffs.isna().all() else ml.index[0]
@@ -188,45 +186,40 @@ def calculate_stochastic_variance(trip_df):
         ml['Season_Cos'] = np.cos(2 * np.pi * ml['Month'] / 12.0)
         ml['Speed_kn'] = ml['Speed_kn'].fillna(12.0)
         
-        # Create a temporary training subset purely to build the Lag error
-        temp_train = ml[ml['Daily_Burn'] > 0]
-        if len(temp_train) < 5: return zeros_df
+        # Filter mask instead of redefining dataframe
+        train_mask = ml['Daily_Burn'] > 0
+        if train_mask.sum() < 5: return zeros_df
 
-        # 4. AUTO-REGRESSIVE RESIDUALS / ETA CATCH-UP (Pillar 5)
-        # We run a preliminary model to get yesterday's error
+        # 4. AUTO-REGRESSIVE RESIDUALS
         temp_features = ['Speed_kn', 'Comm_Cargo_MT', 'Ballast_Water_MT', 'Kinematic_Delta', 'Epoch', 'Season_Sin']
         temp_model = XGBRegressor(n_estimators=50, max_depth=3, random_state=42)
-        temp_model.fit(temp_train[temp_features], temp_train['Daily_Burn'])
+        temp_model.fit(ml.loc[train_mask, temp_features], ml.loc[train_mask, 'Daily_Burn'])
         
-        # Predict on the ENTIRE ml dataset so the chronological shift works perfectly
         ml['Temp_Pred'] = temp_model.predict(ml[temp_features])
-        # Lag 1 Error: How much did we over/under burn yesterday?
         ml['Lag_1_Error'] = (ml['Daily_Burn'] - ml['Temp_Pred']).shift(1).fillna(0)
 
-        # NOW DEFINE THE TRUE TRAINING SET (With Lag_1_Error successfully included)
-        train = ml[ml['Daily_Burn'] > 0].copy()
-
-        # 5. VOYAGE MEMORY DECAY VECTOR (Pillar 3)
+        # 5. VOYAGE MEMORY DECAY VECTOR
         max_date = pd.to_datetime(ml['Date_Start']).max()
-        days_ago = (max_date - pd.to_datetime(train['Date_Start'])).dt.days
-        decay_weights = np.exp(-days_ago / 730.0) # 2-year half-life prioritization
+        days_ago = (max_date - pd.to_datetime(ml.loc[train_mask, 'Date_Start'])).dt.days
+        decay_weights = np.exp(-days_ago / 730.0)
         
         # --- FINAL PHYSICS MODEL TRAINING ---
         features = ['Speed_kn', 'Comm_Cargo_MT', 'Ballast_Water_MT', 'Kinematic_Delta', 'Epoch', 'Season_Sin', 'Season_Cos', 'Lag_1_Error']
-        # Monotonic Constraints: Speed+, Cargo+, Ballast+, Kinematics+, Epoch(0), Sin(0), Cos(0), CatchUp+
         monotone_constraints = (1, 1, 1, 1, 0, 0, 0, 1)
         
         ai_model = XGBRegressor(n_estimators=150, learning_rate=0.05, max_depth=5, random_state=42, 
                                 objective='reg:squarederror', monotone_constraints=monotone_constraints)
         
-        # Train with decay weights
-        ai_model.fit(train[features], train['Daily_Burn'], sample_weight=decay_weights)
+        X_train = ml.loc[train_mask, features]
+        y_train = ml.loc[train_mask, 'Daily_Burn']
         
-        # Heteroscedastic Variance Model (Predicting the error)
-        train_preds = ai_model.predict(train[features])
-        residuals = np.abs(train['Daily_Burn'] - train_preds)
+        ai_model.fit(X_train, y_train, sample_weight=decay_weights)
+        
+        # Heteroscedastic Variance Model
+        train_preds = ai_model.predict(X_train)
+        residuals = np.abs(y_train - train_preds)
         var_model = XGBRegressor(n_estimators=50, learning_rate=0.05, max_depth=3, random_state=42)
-        var_model.fit(train[features], residuals)
+        var_model.fit(X_train, residuals)
         
         X_all = ml[features]
         baseline_prediction = ai_model.predict(X_all)
@@ -237,27 +230,24 @@ def calculate_stochastic_variance(trip_df):
         stochastic_reality = baseline_prediction + np.random.normal(loc=0, scale=dynamic_noise)
         variance_result = (ml['Daily_Burn'] - stochastic_reality) * ml['Days']
         
-        # --- 6. SHAP & GOLDEN STATE ANCHORING (Pillar 2) ---
+        # 6. SHAP & GOLDEN STATE
         explainer = shap.TreeExplainer(ai_model)
         shap_vals = explainer.shap_values(X_all)
         base_val = explainer.expected_value
         if isinstance(base_val, np.ndarray): base_val = base_val[0]
         
-        # Find the "Golden State": The 10 consecutive voyages with highest Admiralty coefficient
         best_window_idx = ml['Admiralty_Proxy'].rolling(10).mean().idxmax()
         if pd.isna(best_window_idx): best_window_idx = ml.index[-1]
         golden_subset = X_all.loc[max(0, best_window_idx-9):best_window_idx]
         golden_baseline_val = ai_model.predict(golden_subset).mean()
         
-        # Calculate the Systemic Degradation Shift
         degradation_shift = base_val - golden_baseline_val
         
-        # High-Dimensional Pooling for v21 UI
-        shap_propulsion = shap_vals[:, 0]  # Speed
-        shap_mass = shap_vals[:, 1] + shap_vals[:, 2] # Cargo + Ballast
-        shap_weather = shap_vals[:, 3] + shap_vals[:, 5] + shap_vals[:, 6] # Kinematic Delta + Seasonality
-        shap_degradation = shap_vals[:, 4] + degradation_shift # Epoch State + Fleet Shift from Golden State
-        shap_catchup = shap_vals[:, 7] # Lag 1 Error
+        shap_propulsion = shap_vals[:, 0]
+        shap_mass = shap_vals[:, 1] + shap_vals[:, 2]
+        shap_weather = shap_vals[:, 3] + shap_vals[:, 5] + shap_vals[:, 6]
+        shap_degradation = shap_vals[:, 4] + degradation_shift
+        shap_catchup = shap_vals[:, 7]
         
         return pd.DataFrame({
             'Stoch_Var': variance_result.round(1),
@@ -458,7 +448,7 @@ def chart_voyage(df):
     fig.update_layout(**_BL,title='Fuel by Commercial Voyage (L = legs)',yaxis=dict(title='MT',**_AX),xaxis=dict(title='Voyage',**_AX)); return fig
 
 st.markdown(f"""
-<div class="hero"><div class="hero-left"><img src="data:image/svg+xml;base64,{_LOGO}" class="hero-logo" alt=""/><div><div class="hero-title">POSEIDON TITAN</div><div class="hero-sub">Fleet Consumables Intelligence Engine</div></div></div><div class="hero-badge"><span>KERNEL</span>&ensp;5-Pillar Epoch XGBoost<br><span>PIPELINE</span>&ensp;D-to-D Immutable Ledger<br><span>BUILD</span>&ensp;v21.1 Absolute Limit Break</div></div>""",unsafe_allow_html=True)
+<div class="hero"><div class="hero-left"><img src="data:image/svg+xml;base64,{_LOGO}" class="hero-logo" alt=""/><div><div class="hero-title">POSEIDON TITAN</div><div class="hero-sub">Fleet Consumables Intelligence Engine</div></div></div><div class="hero-badge"><span>KERNEL</span>&ensp;5-Pillar Epoch XGBoost<br><span>PIPELINE</span>&ensp;D-to-D Immutable Ledger<br><span>BUILD</span>&ensp;v21.2 Absolute Limit Break</div></div>""",unsafe_allow_html=True)
 
 uploaded_files=st.file_uploader('Upload vessel telemetry',accept_multiple_files=True,type=['xlsx','csv'],label_visibility='collapsed')
 
