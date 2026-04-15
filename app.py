@@ -10,7 +10,7 @@ import plotly.graph_objects as go
 from plotly.subplots import make_subplots
 import warnings
 
-# --- BULLETPROOF AI IMPORTS (v21.0: 5-Pillar Limit Break Architecture) ---
+# --- BULLETPROOF AI IMPORTS (v21.1: 5-Pillar Limit Break Architecture - Sequenced) ---
 try:
     from xgboost import XGBRegressor
     from sklearn.metrics import mean_squared_error
@@ -152,7 +152,7 @@ def compute_dqi(r1,r2,daily_burn,drift,chrono_bad,mgo_neg):
     return min(100,max(0,round(math.exp(log_sum)*100,0)))
 
 # ═══════════════════════════════════════════════════════════════════════════════
-# AI DIGITAL TWIN MODULE (v21.0: 5-PILLAR LIMIT BREAK ARCHITECTURE)
+# AI DIGITAL TWIN MODULE (v21.1: 5-PILLAR LIMIT BREAK ARCHITECTURE)
 # ═══════════════════════════════════════════════════════════════════════════════
 @st.cache_data(show_spinner=False)
 def calculate_stochastic_variance(trip_df):
@@ -188,17 +188,23 @@ def calculate_stochastic_variance(trip_df):
         ml['Season_Cos'] = np.cos(2 * np.pi * ml['Month'] / 12.0)
         ml['Speed_kn'] = ml['Speed_kn'].fillna(12.0)
         
-        train = ml[ml['Daily_Burn'] > 0]
-        if len(train) < 5: return zeros_df
+        # Create a temporary training subset purely to build the Lag error
+        temp_train = ml[ml['Daily_Burn'] > 0]
+        if len(temp_train) < 5: return zeros_df
 
         # 4. AUTO-REGRESSIVE RESIDUALS / ETA CATCH-UP (Pillar 5)
         # We run a preliminary model to get yesterday's error
         temp_features = ['Speed_kn', 'Comm_Cargo_MT', 'Ballast_Water_MT', 'Kinematic_Delta', 'Epoch', 'Season_Sin']
         temp_model = XGBRegressor(n_estimators=50, max_depth=3, random_state=42)
-        temp_model.fit(train[temp_features], train['Daily_Burn'])
+        temp_model.fit(temp_train[temp_features], temp_train['Daily_Burn'])
+        
+        # Predict on the ENTIRE ml dataset so the chronological shift works perfectly
         ml['Temp_Pred'] = temp_model.predict(ml[temp_features])
         # Lag 1 Error: How much did we over/under burn yesterday?
         ml['Lag_1_Error'] = (ml['Daily_Burn'] - ml['Temp_Pred']).shift(1).fillna(0)
+
+        # NOW DEFINE THE TRUE TRAINING SET (With Lag_1_Error successfully included)
+        train = ml[ml['Daily_Burn'] > 0].copy()
 
         # 5. VOYAGE MEMORY DECAY VECTOR (Pillar 3)
         max_date = pd.to_datetime(ml['Date_Start']).max()
@@ -452,7 +458,7 @@ def chart_voyage(df):
     fig.update_layout(**_BL,title='Fuel by Commercial Voyage (L = legs)',yaxis=dict(title='MT',**_AX),xaxis=dict(title='Voyage',**_AX)); return fig
 
 st.markdown(f"""
-<div class="hero"><div class="hero-left"><img src="data:image/svg+xml;base64,{_LOGO}" class="hero-logo" alt=""/><div><div class="hero-title">POSEIDON TITAN</div><div class="hero-sub">Fleet Consumables Intelligence Engine</div></div></div><div class="hero-badge"><span>KERNEL</span>&ensp;5-Pillar Epoch XGBoost<br><span>PIPELINE</span>&ensp;D-to-D Immutable Ledger<br><span>BUILD</span>&ensp;v21.0 Absolute Limit Break</div></div>""",unsafe_allow_html=True)
+<div class="hero"><div class="hero-left"><img src="data:image/svg+xml;base64,{_LOGO}" class="hero-logo" alt=""/><div><div class="hero-title">POSEIDON TITAN</div><div class="hero-sub">Fleet Consumables Intelligence Engine</div></div></div><div class="hero-badge"><span>KERNEL</span>&ensp;5-Pillar Epoch XGBoost<br><span>PIPELINE</span>&ensp;D-to-D Immutable Ledger<br><span>BUILD</span>&ensp;v21.1 Absolute Limit Break</div></div>""",unsafe_allow_html=True)
 
 uploaded_files=st.file_uploader('Upload vessel telemetry',accept_multiple_files=True,type=['xlsx','csv'],label_visibility='collapsed')
 
