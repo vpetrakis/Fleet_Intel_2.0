@@ -10,7 +10,7 @@ import plotly.graph_objects as go
 from plotly.subplots import make_subplots
 import warnings
 
-# --- BULLETPROOF AI IMPORTS (v21.2: Cache-Breaker Architecture) ---
+# --- BULLETPROOF AI IMPORTS (v21.3: Nuclear Cache-Buster) ---
 try:
     from xgboost import XGBRegressor
     from sklearn.metrics import mean_squared_error
@@ -152,10 +152,10 @@ def compute_dqi(r1,r2,daily_burn,drift,chrono_bad,mgo_neg):
     return min(100,max(0,round(math.exp(log_sum)*100,0)))
 
 # ═══════════════════════════════════════════════════════════════════════════════
-# AI DIGITAL TWIN MODULE (v21.2: BULLETPROOF CACHE BREAKER)
+# AI DIGITAL TWIN MODULE (v21.3: CACHE-BUSTER - NO CACHE DECORATOR)
 # ═══════════════════════════════════════════════════════════════════════════════
-@st.cache_data(show_spinner=False)
-def calculate_stochastic_variance(trip_df):
+# Removed @st.cache_data to force Streamlit to run this fresh every time
+def compute_ai_diagnostics(trip_df):
     zeros_df = pd.DataFrame({
         'Stoch_Var': [0.0]*len(trip_df), 'Expected_Var': [0.0]*len(trip_df), 'SHAP_Golden_Base': [0.0]*len(trip_df),
         'SHAP_Degradation': [0.0]*len(trip_df), 'SHAP_Propulsion': [0.0]*len(trip_df), 'SHAP_Mass': [0.0]*len(trip_df), 
@@ -186,17 +186,18 @@ def calculate_stochastic_variance(trip_df):
         ml['Season_Cos'] = np.cos(2 * np.pi * ml['Month'] / 12.0)
         ml['Speed_kn'] = ml['Speed_kn'].fillna(12.0)
         
-        # Filter mask instead of redefining dataframe
+        # Filter mask
         train_mask = ml['Daily_Burn'] > 0
         if train_mask.sum() < 5: return zeros_df
 
-        # 4. AUTO-REGRESSIVE RESIDUALS
+        # 4. AUTO-REGRESSIVE RESIDUALS (Safe Assignment)
         temp_features = ['Speed_kn', 'Comm_Cargo_MT', 'Ballast_Water_MT', 'Kinematic_Delta', 'Epoch', 'Season_Sin']
         temp_model = XGBRegressor(n_estimators=50, max_depth=3, random_state=42)
         temp_model.fit(ml.loc[train_mask, temp_features], ml.loc[train_mask, 'Daily_Burn'])
         
-        ml['Temp_Pred'] = temp_model.predict(ml[temp_features])
-        ml['Lag_1_Error'] = (ml['Daily_Burn'] - ml['Temp_Pred']).shift(1).fillna(0)
+        # Explicit column creation using assign to prevent KeyErrors
+        ml = ml.assign(Temp_Pred=temp_model.predict(ml[temp_features]))
+        ml = ml.assign(Lag_1_Error=(ml['Daily_Burn'] - ml['Temp_Pred']).shift(1).fillna(0))
 
         # 5. VOYAGE MEMORY DECAY VECTOR
         max_date = pd.to_datetime(ml['Date_Start']).max()
@@ -264,8 +265,9 @@ def calculate_stochastic_variance(trip_df):
         st.error(f"AI ENGINE CRASHED: {str(e)}")
         return zeros_df
 
+# Renamed function to completely orphan Streamlit's old cache directory
 @st.cache_data(show_spinner=False)
-def process_file(uploaded_file):
+def ingest_telemetry(uploaded_file):
     vn_raw=re.sub(r'\.[^.]+$','',uploaded_file.name).strip()
     vname=re.sub(r'[_\-]+',' ',vn_raw).upper()
     uploaded_file.seek(0)
@@ -386,7 +388,7 @@ def process_file(uploaded_file):
                     trip_df.loc[mask,'Status']='STAT OUTLIER'; trip_df.loc[mask,'Indicator']=ICONS['STAT OUTLIER']
                     
     if not trip_df.empty:
-        ai_df = calculate_stochastic_variance(trip_df)
+        ai_df = compute_ai_diagnostics(trip_df)
         for col in ai_df.columns: trip_df[col] = ai_df[col]
         cols=list(trip_df.columns)
         if 'Stoch_Var' in cols and 'DQI' in cols:
@@ -448,7 +450,7 @@ def chart_voyage(df):
     fig.update_layout(**_BL,title='Fuel by Commercial Voyage (L = legs)',yaxis=dict(title='MT',**_AX),xaxis=dict(title='Voyage',**_AX)); return fig
 
 st.markdown(f"""
-<div class="hero"><div class="hero-left"><img src="data:image/svg+xml;base64,{_LOGO}" class="hero-logo" alt=""/><div><div class="hero-title">POSEIDON TITAN</div><div class="hero-sub">Fleet Consumables Intelligence Engine</div></div></div><div class="hero-badge"><span>KERNEL</span>&ensp;5-Pillar Epoch XGBoost<br><span>PIPELINE</span>&ensp;D-to-D Immutable Ledger<br><span>BUILD</span>&ensp;v21.2 Absolute Limit Break</div></div>""",unsafe_allow_html=True)
+<div class="hero"><div class="hero-left"><img src="data:image/svg+xml;base64,{_LOGO}" class="hero-logo" alt=""/><div><div class="hero-title">POSEIDON TITAN</div><div class="hero-sub">Fleet Consumables Intelligence Engine</div></div></div><div class="hero-badge"><span>KERNEL</span>&ensp;5-Pillar Epoch XGBoost<br><span>PIPELINE</span>&ensp;D-to-D Immutable Ledger<br><span>BUILD</span>&ensp;v21.3 Cache Annihilator</div></div>""",unsafe_allow_html=True)
 
 uploaded_files=st.file_uploader('Upload vessel telemetry',accept_multiple_files=True,type=['xlsx','csv'],label_visibility='collapsed')
 
@@ -470,7 +472,7 @@ fleet_results=[]
 for f in uploaded_files:
     try:
         with st.spinner(f'Processing {f.name}...'):
-            df,vname,summary,cum_drift, ai_df_raw=process_file(f)
+            df,vname,summary,cum_drift, ai_df_raw=ingest_telemetry(f)
         if df.empty: st.warning(f'No D-to-D cycles in {f.name}.'); continue
         fleet_results.append({'name':vname,'summary':summary,'df':df})
         integrity=summary['integrity']; avg_dqi=summary['avg_dqi']
