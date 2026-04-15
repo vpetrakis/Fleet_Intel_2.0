@@ -10,7 +10,7 @@ import plotly.graph_objects as go
 from plotly.subplots import make_subplots
 import warnings
 
-# --- BULLETPROOF AI IMPORTS (v21.3: Nuclear Cache-Buster) ---
+# --- BULLETPROOF AI IMPORTS (v21.4: Pure Baseline Architecture) ---
 try:
     from xgboost import XGBRegressor
     from sklearn.metrics import mean_squared_error
@@ -152,12 +152,11 @@ def compute_dqi(r1,r2,daily_burn,drift,chrono_bad,mgo_neg):
     return min(100,max(0,round(math.exp(log_sum)*100,0)))
 
 # ═══════════════════════════════════════════════════════════════════════════════
-# AI DIGITAL TWIN MODULE (v21.3: CACHE-BUSTER - NO CACHE DECORATOR)
+# AI DIGITAL TWIN MODULE (v21.4: PURE MATHEMATICAL BASELINE)
 # ═══════════════════════════════════════════════════════════════════════════════
-# Removed @st.cache_data to force Streamlit to run this fresh every time
 def compute_ai_diagnostics(trip_df):
     zeros_df = pd.DataFrame({
-        'Stoch_Var': [0.0]*len(trip_df), 'Expected_Var': [0.0]*len(trip_df), 'SHAP_Golden_Base': [0.0]*len(trip_df),
+        'Stoch_Var': [0.0]*len(trip_df), 'Expected_Var': [0.0]*len(trip_df), 'SHAP_Base': [0.0]*len(trip_df),
         'SHAP_Degradation': [0.0]*len(trip_df), 'SHAP_Propulsion': [0.0]*len(trip_df), 'SHAP_Mass': [0.0]*len(trip_df), 
         'SHAP_Weather': [0.0]*len(trip_df), 'SHAP_CatchUp': [0.0]*len(trip_df)
     }, index=trip_df.index)
@@ -167,12 +166,12 @@ def compute_ai_diagnostics(trip_df):
             
         ml = trip_df[['Speed_kn', 'CargoQty', 'Condition', 'Route', 'Daily_Burn', 'Days', 'Date_Start', 'Dist_NM']].copy()
         
-        # 1. KINEMATIC WEATHER EXTRACTION
+        # 1. CLAMPED KINEMATICS (Max 3-Knot Current)
         ml['SOG_kn'] = ml['Dist_NM'] / np.maximum(ml['Days'] * 24, 0.1)
-        ml['Kinematic_Delta'] = ml['Speed_kn'] - ml['SOG_kn']
+        ml['Kinematic_Delta'] = (ml['Speed_kn'] - ml['SOG_kn']).clip(-3.0, 3.0)
         
-        # 2. ALGORITHMIC EPOCH DETECTION
-        ml['Admiralty_Proxy'] = ((ml['CargoQty'] + 10000)**(2/3) * ml['Speed_kn']**3) / np.maximum(ml['Daily_Burn'], 1)
+        # 2. EPOCH DETECTION (Ignore Fuel Typos < 5 MT to prevent Proxy explosion)
+        ml['Admiralty_Proxy'] = ((ml['CargoQty'] + 10000)**(2/3) * ml['Speed_kn']**3) / np.maximum(ml['Daily_Burn'], 5.0)
         smoothed = ml['Admiralty_Proxy'].rolling(window=15, min_periods=1).mean()
         diffs = smoothed.diff().abs()
         break_idx = diffs.idxmax() if not diffs.isna().all() else ml.index[0]
@@ -186,18 +185,16 @@ def compute_ai_diagnostics(trip_df):
         ml['Season_Cos'] = np.cos(2 * np.pi * ml['Month'] / 12.0)
         ml['Speed_kn'] = ml['Speed_kn'].fillna(12.0)
         
-        # Filter mask
         train_mask = ml['Daily_Burn'] > 0
         if train_mask.sum() < 5: return zeros_df
 
-        # 4. AUTO-REGRESSIVE RESIDUALS (Safe Assignment)
+        # 4. CLAMPED AUTO-REGRESSIVE RESIDUALS (Max 15 MT Catch-Up)
         temp_features = ['Speed_kn', 'Comm_Cargo_MT', 'Ballast_Water_MT', 'Kinematic_Delta', 'Epoch', 'Season_Sin']
         temp_model = XGBRegressor(n_estimators=50, max_depth=3, random_state=42)
         temp_model.fit(ml.loc[train_mask, temp_features], ml.loc[train_mask, 'Daily_Burn'])
         
-        # Explicit column creation using assign to prevent KeyErrors
         ml = ml.assign(Temp_Pred=temp_model.predict(ml[temp_features]))
-        ml = ml.assign(Lag_1_Error=(ml['Daily_Burn'] - ml['Temp_Pred']).shift(1).fillna(0))
+        ml = ml.assign(Lag_1_Error=(ml['Daily_Burn'] - ml['Temp_Pred']).shift(1).fillna(0).clip(-15.0, 15.0))
 
         # 5. VOYAGE MEMORY DECAY VECTOR
         max_date = pd.to_datetime(ml['Date_Start']).max()
@@ -231,29 +228,22 @@ def compute_ai_diagnostics(trip_df):
         stochastic_reality = baseline_prediction + np.random.normal(loc=0, scale=dynamic_noise)
         variance_result = (ml['Daily_Burn'] - stochastic_reality) * ml['Days']
         
-        # 6. SHAP & GOLDEN STATE
+        # 6. SHAP - PURE MATHEMATICAL BASELINE (No artificial shifts)
         explainer = shap.TreeExplainer(ai_model)
         shap_vals = explainer.shap_values(X_all)
         base_val = explainer.expected_value
         if isinstance(base_val, np.ndarray): base_val = base_val[0]
         
-        best_window_idx = ml['Admiralty_Proxy'].rolling(10).mean().idxmax()
-        if pd.isna(best_window_idx): best_window_idx = ml.index[-1]
-        golden_subset = X_all.loc[max(0, best_window_idx-9):best_window_idx]
-        golden_baseline_val = ai_model.predict(golden_subset).mean()
-        
-        degradation_shift = base_val - golden_baseline_val
-        
         shap_propulsion = shap_vals[:, 0]
         shap_mass = shap_vals[:, 1] + shap_vals[:, 2]
         shap_weather = shap_vals[:, 3] + shap_vals[:, 5] + shap_vals[:, 6]
-        shap_degradation = shap_vals[:, 4] + degradation_shift
+        shap_degradation = shap_vals[:, 4]  # Pure Epoch shift, perfectly additive
         shap_catchup = shap_vals[:, 7]
         
         return pd.DataFrame({
             'Stoch_Var': variance_result.round(1),
             'Expected_Var': expected_variance_daily,
-            'SHAP_Golden_Base': [golden_baseline_val] * len(X_all),
+            'SHAP_Base': [base_val] * len(X_all),
             'SHAP_Degradation': shap_degradation,
             'SHAP_Propulsion': shap_propulsion,
             'SHAP_Mass': shap_mass,
@@ -265,8 +255,6 @@ def compute_ai_diagnostics(trip_df):
         st.error(f"AI ENGINE CRASHED: {str(e)}")
         return zeros_df
 
-# Renamed function to completely orphan Streamlit's old cache directory
-@st.cache_data(show_spinner=False)
 def ingest_telemetry(uploaded_file):
     vn_raw=re.sub(r'\.[^.]+$','',uploaded_file.name).strip()
     vname=re.sub(r'[_\-]+',' ',vn_raw).upper()
@@ -450,7 +438,7 @@ def chart_voyage(df):
     fig.update_layout(**_BL,title='Fuel by Commercial Voyage (L = legs)',yaxis=dict(title='MT',**_AX),xaxis=dict(title='Voyage',**_AX)); return fig
 
 st.markdown(f"""
-<div class="hero"><div class="hero-left"><img src="data:image/svg+xml;base64,{_LOGO}" class="hero-logo" alt=""/><div><div class="hero-title">POSEIDON TITAN</div><div class="hero-sub">Fleet Consumables Intelligence Engine</div></div></div><div class="hero-badge"><span>KERNEL</span>&ensp;5-Pillar Epoch XGBoost<br><span>PIPELINE</span>&ensp;D-to-D Immutable Ledger<br><span>BUILD</span>&ensp;v21.3 Cache Annihilator</div></div>""",unsafe_allow_html=True)
+<div class="hero"><div class="hero-left"><img src="data:image/svg+xml;base64,{_LOGO}" class="hero-logo" alt=""/><div><div class="hero-title">POSEIDON TITAN</div><div class="hero-sub">Fleet Consumables Intelligence Engine</div></div></div><div class="hero-badge"><span>KERNEL</span>&ensp;5-Pillar Epoch XGBoost<br><span>PIPELINE</span>&ensp;D-to-D Immutable Ledger<br><span>BUILD</span>&ensp;v21.4 Pure Baseline Check</div></div>""",unsafe_allow_html=True)
 
 uploaded_files=st.file_uploader('Upload vessel telemetry',accept_multiple_files=True,type=['xlsx','csv'],label_visibility='collapsed')
 
@@ -501,7 +489,7 @@ for f in uploaded_files:
         tab1, tab2, tab3, tab4, tab5, tab6 = st.tabs(['AUDIT MATRIX', 'FUEL ANALYTICS', 'DRIFT TRAJECTORY', 'LUBE OIL', 'FORENSIC DETAIL', 'AI EXPLAINER (SHAP)'])
 
         with tab1:
-            dcfg={'Indicator':st.column_config.ImageColumn(' ',width='small'),'Timeline':st.column_config.TextColumn('TIMELINE',width='medium'),'Phase':st.column_config.TextColumn('PH',width='small'),'Condition':st.column_config.TextColumn('COND',width='small'),'Route':st.column_config.TextColumn('ROUTE',width='large'),'Days':st.column_config.NumberColumn('DAYS',format='%.2f'),'Dist_NM':st.column_config.NumberColumn('DIST',format='%d'),'Speed_kn':st.column_config.NumberColumn('SPD',format='%.1f'),'HFO_MT':st.column_config.NumberColumn('HFO',format='%.1f'),'MGO_MT':st.column_config.NumberColumn('MGO',format='%.1f'),'Fuel_MT':st.column_config.NumberColumn('FUEL',format='%.1f'),'Daily_Burn':st.column_config.ProgressColumn('BURN',format='%.1f',min_value=0,max_value=float(max(df['Daily_Burn'].max()*1.15,1))),'MELO_L':st.column_config.NumberColumn('MELO',format='%d'),'CYLO_L':st.column_config.NumberColumn('CYLO',format='%d'),'GELO_L':st.column_config.NumberColumn('GELO',format='%d'),'Stoch_Var':st.column_config.NumberColumn('STOCH VAR',format='%.1f'),'DQI':st.column_config.ProgressColumn('DQI',format='%d',min_value=0,max_value=100),'Status':st.column_config.TextColumn('STATUS',width='medium'),'Flags':st.column_config.TextColumn('FLAGS',width='medium'),'Voy':None, 'CargoQty':None, 'SHAP_Golden_Base':None, 'SHAP_Propulsion':None, 'SHAP_Mass':None, 'SHAP_Weather':None, 'SHAP_Degradation':None, 'SHAP_CatchUp':None}
+            dcfg={'Indicator':st.column_config.ImageColumn(' ',width='small'),'Timeline':st.column_config.TextColumn('TIMELINE',width='medium'),'Phase':st.column_config.TextColumn('PH',width='small'),'Condition':st.column_config.TextColumn('COND',width='small'),'Route':st.column_config.TextColumn('ROUTE',width='large'),'Days':st.column_config.NumberColumn('DAYS',format='%.2f'),'Dist_NM':st.column_config.NumberColumn('DIST',format='%d'),'Speed_kn':st.column_config.NumberColumn('SPD',format='%.1f'),'HFO_MT':st.column_config.NumberColumn('HFO',format='%.1f'),'MGO_MT':st.column_config.NumberColumn('MGO',format='%.1f'),'Fuel_MT':st.column_config.NumberColumn('FUEL',format='%.1f'),'Daily_Burn':st.column_config.ProgressColumn('BURN',format='%.1f',min_value=0,max_value=float(max(df['Daily_Burn'].max()*1.15,1))),'MELO_L':st.column_config.NumberColumn('MELO',format='%d'),'CYLO_L':st.column_config.NumberColumn('CYLO',format='%d'),'GELO_L':st.column_config.NumberColumn('GELO',format='%d'),'Stoch_Var':st.column_config.NumberColumn('STOCH VAR',format='%.1f'),'DQI':st.column_config.ProgressColumn('DQI',format='%d',min_value=0,max_value=100),'Status':st.column_config.TextColumn('STATUS',width='medium'),'Flags':st.column_config.TextColumn('FLAGS',width='medium'),'Voy':None, 'CargoQty':None, 'SHAP_Base':None, 'SHAP_Propulsion':None, 'SHAP_Mass':None, 'SHAP_Weather':None, 'SHAP_Degradation':None, 'SHAP_CatchUp':None}
             st.dataframe(df,column_config=dcfg,hide_index=True,use_container_width=True,height=min(500,38+len(df)*35))
             buf=io.BytesIO(); exp=df.drop(columns=['Indicator'],errors='ignore')
             with pd.ExcelWriter(buf,engine='openpyxl') as w: exp.to_excel(w,index=False,sheet_name='Audit')
@@ -536,11 +524,11 @@ for f in uploaded_files:
                     dm={'GHOST BUNKER':f"Net fuel = {row['Fuel_MT']:.1f} MT (negative) — unrecorded bunkering ~{abs(row['Fuel_MT']):.0f} MT. DQI: {row['DQI']}%.{fl}",'LEDGER VARIANCE':f"XGBoost Stochastic Variance: {ai_v:.1f} MT exceeded threshold. DQI: {row['DQI']}%. {row['Condition']} leg, {row['Days']:.1f}d.{fl}",'STAT OUTLIER':f"Burn {row['Daily_Burn']:.1f} MT/d outside {row['Condition']} IQR fence. Stoch Var: {ai_v:.1f} MT. DQI: {row['DQI']}%.{fl}"}
                     st.markdown(f'<div class="acard" style="border:1px solid rgba({ri[0]},{ri[1]},{ri[2]},.12);border-left:3px solid {sc}"><div style="display:flex;justify-content:space-between;align-items:center"><div><span style="color:{sc};font-weight:700;font-size:.7rem;letter-spacing:.08em;font-family:var(--fm)">{s}</span><span style="color:var(--t3);font-size:.7rem;margin-left:10px;font-family:var(--fm)">{row["Timeline"]}</span></div><span style="color:var(--t2);font-size:.68rem;font-family:var(--fb)">{row["Route"]}</span></div><div style="color:var(--t2);font-size:.7rem;margin-top:8px;line-height:1.6;font-family:var(--fb)">{dm.get(s,"")}</div></div>',unsafe_allow_html=True)
                     
-        # --- 10/10 LIMIT BREAK UI: 5-PILLAR SHAP WATERFALL ---
+        # --- 10/10 LIMIT BREAK UI: SHAP WATERFALL ---
         with tab6:
             st.markdown('<h3 style="color:#fff;font-family:var(--fd);font-size:1.2rem;margin-bottom:10px;margin-top:10px">Neural Logic Extraction</h3>', unsafe_allow_html=True)
             
-            shap_ran = df['SHAP_Golden_Base'].abs().sum() > 0 if 'SHAP_Golden_Base' in df.columns else False
+            shap_ran = df['SHAP_Base'].abs().sum() > 0 if 'SHAP_Base' in df.columns else False
             
             if not shap_ran:
                 st.warning("⚠️ **AI EXPLAINABILITY OFFLINE:** The engine did not generate neural logic for this dataset.")
@@ -563,15 +551,15 @@ for f in uploaded_files:
                 col_shap, col_radar = st.columns([7, 3])
                 
                 with col_shap:
-                    expected = target_row['SHAP_Golden_Base'] + target_row['SHAP_Degradation'] + target_row['SHAP_Propulsion'] + target_row['SHAP_Mass'] + target_row['SHAP_Weather'] + target_row['SHAP_CatchUp']
+                    expected = target_row['SHAP_Base'] + target_row['SHAP_Degradation'] + target_row['SHAP_Propulsion'] + target_row['SHAP_Mass'] + target_row['SHAP_Weather'] + target_row['SHAP_CatchUp']
                     
                     fig_w = go.Figure(go.Waterfall(
                         name="SHAP", orientation="v",
                         measure=["absolute", "relative", "relative", "relative", "relative", "relative", "total"],
-                        x=["Golden State Base", "Systemic Wear", "Propulsion", "Mass", "Weather (Kinematics)", "ETA Catch-Up", "Expected Burn"],
+                        x=["Fleet Average Base", "Systemic Wear", "Propulsion", "Mass", "Weather (Kinematics)", "ETA Catch-Up", "Expected Burn"],
                         textposition="outside",
-                        text=[f"{target_row['SHAP_Golden_Base']:.1f}", f"{target_row['SHAP_Degradation']:+.1f}", f"{target_row['SHAP_Propulsion']:+.1f}", f"{target_row['SHAP_Mass']:+.1f}", f"{target_row['SHAP_Weather']:+.1f}", f"{target_row['SHAP_CatchUp']:+.1f}", f"{expected:.1f}"],
-                        y=[target_row['SHAP_Golden_Base'], target_row['SHAP_Degradation'], target_row['SHAP_Propulsion'], target_row['SHAP_Mass'], target_row['SHAP_Weather'], target_row['SHAP_CatchUp'], 0],
+                        text=[f"{target_row['SHAP_Base']:.1f}", f"{target_row['SHAP_Degradation']:+.1f}", f"{target_row['SHAP_Propulsion']:+.1f}", f"{target_row['SHAP_Mass']:+.1f}", f"{target_row['SHAP_Weather']:+.1f}", f"{target_row['SHAP_CatchUp']:+.1f}", f"{expected:.1f}"],
+                        y=[target_row['SHAP_Base'], target_row['SHAP_Degradation'], target_row['SHAP_Propulsion'], target_row['SHAP_Mass'], target_row['SHAP_Weather'], target_row['SHAP_CatchUp'], 0],
                         connector={"line":{"color":"rgba(201,168,76,0.15)"}},
                         decreasing={"marker":{"color":"#00e0b0"}},
                         increasing={"marker":{"color":"#e63946"}},
@@ -621,7 +609,7 @@ for f in uploaded_files:
                         </div>
                         """, unsafe_allow_html=True)
                 
-                st.info(f"**Forensic Translation:** The AI anchored the burn at the vessel's all-time historical best (**{target_row['SHAP_Golden_Base']:.1f} MT**). Age/Hull wear added **{target_row['SHAP_Degradation']:+.1f} MT**. Speed effort added **{target_row['SHAP_Propulsion']:+.1f} MT**. Cargo mass added **{target_row['SHAP_Mass']:+.1f} MT**. Ocean currents and weather added **{target_row['SHAP_Weather']:+.1f} MT**. The Master's attempt to catch up to ETA added **{target_row['SHAP_CatchUp']:+.1f} MT**.\n\nExpected Burn: **{expected:.1f} MT** | Chief Engineer Reported: **{target_row['Daily_Burn']:.1f} MT**.")
+                st.info(f"**Forensic Translation:** The AI anchored the burn at the dataset's historical mathematical average (**{target_row['SHAP_Base']:.1f} MT**). Age/Hull wear shifted it by **{target_row['SHAP_Degradation']:+.1f} MT**. Speed effort added **{target_row['SHAP_Propulsion']:+.1f} MT**. Cargo mass added **{target_row['SHAP_Mass']:+.1f} MT**. Ocean currents and weather added **{target_row['SHAP_Weather']:+.1f} MT**. The Master's attempt to catch up to ETA added **{target_row['SHAP_CatchUp']:+.1f} MT**.\n\nExpected Burn: **{expected:.1f} MT** | Chief Engineer Reported: **{target_row['Daily_Burn']:.1f} MT**.")
 
         st.divider()
     except Exception:
