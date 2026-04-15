@@ -1,10 +1,3 @@
-Just as you meticulously optimized the 100 TWh Blue Ammonia and Pipeline energy imports across Norway, Qatar, and Russia to exactly €9.34 Billion, we are going to optimize the specific operational footprint of these vessels with the same uncompromising mathematical rigor.
-
-Here is the **10/10 Limit Break** build. I have stripped out the hardcoded physics and replaced the engine with **Data-Native Causal Modeling** (Monotonic Constraints, Split-Mass Vectors, CYLO Polygraph, and Seasonal Cyclicality). I also completely rewrote the CSS for the file uploader to fix the "Browse Files" button overlapping with the text.
-
-This code is bug-free, copy-paste ready, and ready to launch. Replace your entire `app.py` with this:
-
-```python
 import streamlit as st
 import pandas as pd
 import numpy as np
@@ -612,4 +605,3 @@ if len(fleet_results)>1:
         fig.add_trace(go.Bar(name=r['name'],x=['Total Fuel','Avg Burn x10','Anomalies x10','DQI'],y=[r['summary']['total_fuel'],r['summary']['avg_burn']*10,r['summary']['anomalies']*10,r['summary']['avg_dqi']]))
     fig.update_layout(**_BL,title='Fleet Comparison',barmode='group',yaxis=dict(**_AX),xaxis=dict(**_AX))
     st.plotly_chart(fig,use_container_width=True,config={'displayModeBar':False})
-```
