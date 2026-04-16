@@ -128,8 +128,8 @@ def _parse_dt(d_val,t_val):
     except: return pd.NaT
 
 # Downstream contract: columns expected by trip builder, DQI, charts, XGBoost
-ZERO_COLS=['DistLeg','TotalDist','TotalTime','Speed','Bunk_FO','Bunk_MGO','Bunk_MELO','Bunk_HSCYLO','Bunk_LSCYLO','Bunk_GELO','CargoQty','Diff_FO','Diff_MGO']
-ROB_COLS=['FO_A','FO_L','MGO_A','MGO_L','MELO_R','HSCYLO_R','LSCYLO_R','GELO_R','FW_R']
+ZERO_COLS=['DistLeg','TotalDist','TotalTime','Speed','Bunk_FO','Bunk_MGO','Bunk_MELO','Bunk_HSCYLO','Bunk_LSCYLO','Bunk_CYLO','Bunk_GELO','CargoQty','Diff_FO','Diff_MGO']
+ROB_COLS=['FO_A','FO_L','MGO_A','MGO_L','MELO_R','HSCYLO_R','LSCYLO_R','CYLO_R','GELO_R','FW_R']
 TEXT_COLS=['Port','Voy','AD','CargoName']
 
 # ═══════════════════════════════════════════════════════════════════════════════
@@ -168,8 +168,8 @@ def _match_column(parent, child):
         if re.search(r'HSCYLO|HS\s*CYL', cc): return 'Bunk_HSCYLO'
         if re.search(r'LSCYLO|LS\s*CYL', cc): return 'Bunk_LSCYLO'
         if re.search(r'^GELO', cc): return 'Bunk_GELO'
-        # Generic CYLO without HS/LS prefix → map to Bunk_HSCYLO as safest default
-        if re.search(r'^CYLO$|^CYL\s*OIL', cc): return 'Bunk_HSCYLO'
+        # Generic CYLO without HS/LS prefix → separate canonical field
+        if re.search(r'^CYLO$|^CYL\s*OIL', cc): return 'Bunk_CYLO'
         return None
 
     # ── ROB / Remaining On Board fields ──
@@ -183,8 +183,8 @@ def _match_column(parent, child):
         if re.search(r'LSCYLO|LS\s*CYL', cc): return 'LSCYLO_R'
         if re.search(r'^GELO', cc): return 'GELO_R'
         if re.search(r'^FW$|FRESH', cc): return 'FW_R'
-        # Generic CYLO → HSCYLO_R
-        if re.search(r'^CYLO$', cc): return 'HSCYLO_R'
+        # Generic CYLO → separate canonical ROB field
+        if re.search(r'^CYLO$', cc): return 'CYLO_R'
         return None
 
     # ── Operation fields ──
@@ -271,10 +271,13 @@ def semantic_parse(df_raw):
 
     # 8. Debug info
     auto_created = [c for c in ZERO_COLS + ROB_COLS + TEXT_COLS if c not in mapped_names]
+    # Flag generic CYLO mappings as ambiguous (not HS/LS-specific)
+    ambiguous = [f"{v} (col {k}: generic CYLO without HS/LS prefix)" for k,v in col_map.items() if v in ('Bunk_CYLO','CYLO_R')]
     debug = {
         'header_rows': [best_row, h1_idx],
         'mapped': {i: col_map[i] for i in sorted(col_map)},
         'auto_created': auto_created,
+        'ambiguous': ambiguous,
         'unmapped_source': [i for i in range(ncols) if i not in col_map],
     }
 
@@ -413,11 +416,12 @@ def ingest_telemetry(uploaded_file):
         bsl=df.loc[idx1+1:idx2]
         bfo=bsl['Bunk_FO'].sum(); bmgo=bsl['Bunk_MGO'].sum()
         bmelo=bsl['Bunk_MELO'].sum(); bhsc=bsl['Bunk_HSCYLO'].sum()
-        blsc=bsl['Bunk_LSCYLO'].sum(); bgelo=bsl['Bunk_GELO'].sum()
+        blsc=bsl['Bunk_LSCYLO'].sum(); bcylo=bsl['Bunk_CYLO'].sum(); bgelo=bsl['Bunk_GELO'].sum()
         hfo_c=(foa1-foa2)+bfo; mgo_raw=(mgoa1-mgoa2)+bmgo; mgo_c=max(0.0,mgo_raw); mgo_neg=mgo_raw<-5
         melo_c=max(0,(_sn0(r1.get('MELO_R'))-_sn0(r2.get('MELO_R')))+bmelo)
         hsc_c=max(0,(_sn0(r1.get('HSCYLO_R'))-_sn0(r2.get('HSCYLO_R')))+bhsc)
         lsc_c=max(0,(_sn0(r1.get('LSCYLO_R'))-_sn0(r2.get('LSCYLO_R')))+blsc)
+        cylo_c=max(0,(_sn0(r1.get('CYLO_R'))-_sn0(r2.get('CYLO_R')))+bcylo)
         gelo_c=max(0,(_sn0(r1.get('GELO_R'))-_sn0(r2.get('GELO_R')))+bgelo)
         total_fuel=hfo_c+mgo_c; daily_burn=total_fuel/days if days>0 else 0.0
         drift=abs((foa1-fol1)-(foa2-fol2)); tol=max(30.0,0.03*max(foa1 or 0,foa2 or 0))
@@ -443,7 +447,7 @@ def ingest_telemetry(uploaded_file):
         if chrono_bad: flags.append('TIME_FB')
         if mgo_neg: flags.append('MGO_NEG')
         if bunk_disc>50: flags.append(f'BUNK:{bunk_disc:.0f}')
-        trips.append({'Indicator':ICONS.get(status,ICONS['VERIFIED']),'Timeline':f"{r1['Datetime'].strftime('%d %b %y')}  \u2192  {r2['Datetime'].strftime('%d %b %y')}",'Date_Start':r1['Datetime'],'Phase':phase,'Condition':condition,'CargoQty':qty,'Route':f"{port_dep}  \u2192  {port_arr}",'Days':round(days,2),'Dist_NM':round(leg_nm,0),'Speed_kn':round(speed,1),'HFO_MT':round(hfo_c,1),'MGO_MT':round(mgo_c,1),'Fuel_MT':round(total_fuel,1),'Daily_Burn':round(daily_burn,1),'MELO_L':round(melo_c,0),'CYLO_L':round(hsc_c+lsc_c,0),'GELO_L':round(gelo_c,0),'Drift_MT':round(drift,1),'DQI':int(dqi),'Status':status,'Voy':str(r1['Voy']).strip(),'Flags':','.join(flags) if flags else ''})
+        trips.append({'Indicator':ICONS.get(status,ICONS['VERIFIED']),'Timeline':f"{r1['Datetime'].strftime('%d %b %y')}  \u2192  {r2['Datetime'].strftime('%d %b %y')}",'Date_Start':r1['Datetime'],'Phase':phase,'Condition':condition,'CargoQty':qty,'Route':f"{port_dep}  \u2192  {port_arr}",'Days':round(days,2),'Dist_NM':round(leg_nm,0),'Speed_kn':round(speed,1),'HFO_MT':round(hfo_c,1),'MGO_MT':round(mgo_c,1),'Fuel_MT':round(total_fuel,1),'Daily_Burn':round(daily_burn,1),'MELO_L':round(melo_c,0),'CYLO_L':round(hsc_c+lsc_c+cylo_c,0),'GELO_L':round(gelo_c,0),'Drift_MT':round(drift,1),'DQI':int(dqi),'Status':status,'Voy':str(r1['Voy']).strip(),'Flags':','.join(flags) if flags else ''})
     trip_df=pd.DataFrame(trips)
     # Condition-specific IQR
     if len(trip_df)>=6:
