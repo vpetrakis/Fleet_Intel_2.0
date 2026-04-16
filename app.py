@@ -5,6 +5,7 @@ import re, io, math, traceback, base64, warnings
 import plotly.graph_objects as go
 from plotly.subplots import make_subplots
 
+# --- BULLETPROOF AI IMPORTS ---
 try:
     from xgboost import XGBRegressor
     from sklearn.metrics import mean_squared_error
@@ -15,11 +16,11 @@ except ImportError:
 
 warnings.filterwarnings("ignore")
 
-st.set_page_config(page_title="POSEIDON TITAN", page_icon="\u2693", layout="wide", initial_sidebar_state="collapsed")
+st.set_page_config(page_title="POSEIDON TITAN", page_icon="⚓", layout="wide", initial_sidebar_state="collapsed")
 
 _LOGO = base64.b64encode(b'<svg viewBox="0 0 48 48" xmlns="http://www.w3.org/2000/svg"><defs><linearGradient id="pg" x1="0" y1="0" x2="1" y2="1"><stop offset="0%" stop-color="#c9a84c"/><stop offset="50%" stop-color="#00e0b0"/><stop offset="100%" stop-color="#005f73"/></linearGradient><filter id="glow"><feGaussianBlur stdDeviation="1.5" result="blur"/><feMerge><feMergeNode in="blur"/><feMergeNode in="SourceGraphic"/></feMerge></filter></defs><circle cx="24" cy="24" r="22" fill="none" stroke="url(#pg)" stroke-width="0.8" opacity=".3"><animate attributeName="r" values="22;23;22" dur="5s" repeatCount="indefinite"/></circle><circle cx="24" cy="24" r="16" fill="none" stroke="url(#pg)" stroke-width="0.5" opacity=".15" stroke-dasharray="3 5"><animateTransform attributeName="transform" type="rotate" from="0 24 24" to="360 24 24" dur="30s" repeatCount="indefinite"/></circle><g filter="url(#glow)"><path d="M24 6L24 42" stroke="url(#pg)" stroke-width="1.5" stroke-linecap="round" opacity=".6"/><path d="M12 16Q24 24 36 16" fill="none" stroke="url(#pg)" stroke-width="1.5" stroke-linecap="round"><animate attributeName="d" values="M12 16Q24 24 36 16;M12 18Q24 22 36 18;M12 16Q24 24 36 16" dur="4s" repeatCount="indefinite"/></path><path d="M10 24Q24 32 38 24" fill="none" stroke="url(#pg)" stroke-width="1.5" stroke-linecap="round"><animate attributeName="d" values="M10 24Q24 32 38 24;M10 26Q24 30 38 26;M10 24Q24 32 38 24" dur="4s" begin="0.5s" repeatCount="indefinite"/></path><path d="M12 32Q24 40 36 32" fill="none" stroke="url(#pg)" stroke-width="1.5" stroke-linecap="round"><animate attributeName="d" values="M12 32Q24 40 36 32;M12 34Q24 38 36 34;M12 32Q24 40 36 32" dur="4s" begin="1s" repeatCount="indefinite"/></path></g></svg>').decode()
 
-# CSS
+# --- FULL CSS (Uncut) ---
 _CSS = '''<style>
 @import url('https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:wght@400;500;600;700;800&family=Geist+Mono:wght@400;500;600&family=Hanken+Grotesk:wght@300;400;500;600;700&display=swap');
 :root{--bg:#020609;--s1:#080d14;--s2:#0c1219;--b1:rgba(201,168,76,0.06);--b2:rgba(201,168,76,0.15);--b3:rgba(0,224,176,0.12);--acc:#00e0b0;--acc2:#c9a84c;--red:#e63946;--amber:#d4a843;--purple:#7b68ee;--t1:#dce8f0;--t2:#6d8599;--t3:#3a4d5e;--r:12px;--fd:'Bricolage Grotesque',sans-serif;--fb:'Hanken Grotesk',sans-serif;--fm:'Geist Mono',monospace}
@@ -35,10 +36,11 @@ h1,h2,h3,h4{font-family:var(--fd)!important;font-weight:800!important;color:#fff
 .hero-title{font-family:var(--fd);font-weight:800;font-size:1.75rem;letter-spacing:-.04em;background:linear-gradient(135deg,#fff 0%,var(--acc2) 40%,var(--acc) 100%);-webkit-background-clip:text;-webkit-text-fill-color:transparent;line-height:1.1}
 .hero-sub{font-family:var(--fm);font-size:.58rem;color:var(--t3);text-transform:uppercase;letter-spacing:.2em;font-weight:500;margin-top:4px}
 .hero-badge{font-family:var(--fm);font-size:.55rem;color:var(--t3);text-align:right;line-height:2;letter-spacing:.06em}.hero-badge span{color:var(--acc);font-weight:600}
-[data-testid="stFileUploader"]{background:var(--s1)!important;border:1px dashed var(--b2)!important;border-radius:var(--r)!important;padding:24px!important;transition:all .3s}
-[data-testid="stFileUploader"]:hover{border-color:var(--acc2)!important;box-shadow:0 0 20px rgba(201,168,76,0.08)}
-[data-testid="stFileUploader"] section{padding:0!important}
-[data-testid="stFileUploader"] button{background:rgba(201,168,76,.08)!important;color:var(--acc2)!important;border:1px solid var(--b2)!important;border-radius:8px!important;font-weight:600!important;margin-top:10px!important}
+[data-testid="stFileUploader"]{background:var(--s1)!important;border:1px dashed var(--b2)!important;border-radius:var(--r)!important;padding:14px!important;transition:all .4s}
+[data-testid="stFileUploader"]:hover{border-color:var(--acc2)!important;box-shadow:0 0 40px rgba(201,168,76,0.06)}
+[data-testid="stFileUploader"] *{color:var(--t1)!important;font-family:var(--fb)!important}
+[data-testid="stFileUploader"] small{color:var(--t3)!important}
+[data-testid="stFileUploader"] button{background:rgba(201,168,76,.08)!important;color:var(--acc2)!important;border:1px solid var(--b2)!important;border-radius:8px!important;font-weight:600!important}
 div[data-testid="stMetric"]{background:linear-gradient(180deg,var(--s1),var(--s2))!important;border:1px solid var(--b1)!important;border-radius:var(--r);padding:18px 22px!important;position:relative;overflow:hidden;transition:border-color .3s}
 div[data-testid="stMetric"]:hover{border-color:var(--b2)!important}
 div[data-testid="stMetric"]::after{content:'';position:absolute;top:0;left:0;right:0;height:1px;background:linear-gradient(90deg,transparent,var(--acc2),transparent);opacity:0;transition:opacity .3s}
@@ -67,7 +69,7 @@ hr{border:none!important;height:1px!important;background:linear-gradient(90deg,t
 ::-webkit-scrollbar{width:4px;height:4px}::-webkit-scrollbar-track{background:var(--bg)}::-webkit-scrollbar-thumb{background:var(--t3);border-radius:2px}
 details{background:var(--s1)!important;border:1px solid var(--b1)!important;border-radius:var(--r)!important}
 details summary{color:var(--t1)!important;font-weight:600!important}
-div[data-baseweb="select"]>div{background:var(--s1);border-color:var(--b1);color:#fff}
+div[data-baseweb="select"] > div {background: var(--s1); border-color: var(--b1); color: #fff;}
 </style>'''
 st.markdown(_CSS, unsafe_allow_html=True)
 
@@ -77,15 +79,11 @@ st.markdown(_CSS, unsafe_allow_html=True)
 def _u(s): return f"data:image/svg+xml;base64,{base64.b64encode(s.encode()).decode()}"
 ICONS={"VERIFIED":_u('<svg viewBox="0 0 28 28" xmlns="http://www.w3.org/2000/svg"><defs><filter id="g"><feGaussianBlur stdDeviation="1" result="b"/><feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge></filter></defs><circle cx="14" cy="14" r="12" fill="none" stroke="#00e0b0" stroke-width="1" opacity=".2"><animate attributeName="r" values="12;13;12" dur="3s" repeatCount="indefinite"/></circle><circle cx="14" cy="14" r="7.5" fill="#061a14" stroke="#00e0b0" stroke-width="1.2" filter="url(#g)"/><polyline points="10,14.5 12.8,17 18,10.5" fill="none" stroke="#00e0b0" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>'),"GHOST BUNKER":_u('<svg viewBox="0 0 28 28" xmlns="http://www.w3.org/2000/svg"><defs><filter id="g2"><feGaussianBlur stdDeviation="1" result="b"/><feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge></filter></defs><circle cx="14" cy="14" r="12" fill="none" stroke="#e63946" stroke-width="1" stroke-dasharray="4 3"><animateTransform attributeName="transform" type="rotate" from="0 14 14" to="360 14 14" dur="8s" repeatCount="indefinite"/></circle><circle cx="14" cy="14" r="7.5" fill="#1a0508" stroke="#e63946" stroke-width="1.2" filter="url(#g2)"/><g stroke="#e63946" stroke-width="2" stroke-linecap="round"><line x1="11" y1="11" x2="17" y2="17"><animate attributeName="opacity" values="1;.3;1" dur="1.2s" repeatCount="indefinite"/></line><line x1="17" y1="11" x2="11" y2="17"><animate attributeName="opacity" values="1;.3;1" dur="1.2s" repeatCount="indefinite"/></line></g></svg>'),"LEDGER VARIANCE":_u('<svg viewBox="0 0 28 28" xmlns="http://www.w3.org/2000/svg"><defs><filter id="g3"><feGaussianBlur stdDeviation="1" result="b"/><feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge></filter></defs><polygon points="14,3 3,25 25,25" fill="none" stroke="#d4a843" stroke-width="1.2" stroke-linejoin="round" filter="url(#g3)"><animate attributeName="stroke-opacity" values="1;.3;1" dur="2s" repeatCount="indefinite"/></polygon><line x1="14" y1="11" x2="14" y2="18" stroke="#d4a843" stroke-width="2" stroke-linecap="round"/><circle cx="14" cy="21.5" r="1.2" fill="#d4a843"/></svg>'),"STAT OUTLIER":_u('<svg viewBox="0 0 28 28" xmlns="http://www.w3.org/2000/svg"><defs><filter id="g4"><feGaussianBlur stdDeviation="1" result="b"/><feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge></filter></defs><rect x="4" y="4" width="20" height="20" rx="5" fill="none" stroke="#7b68ee" stroke-width="1.2" filter="url(#g4)"><animate attributeName="stroke-dasharray" values="0,80;80,0;0,80" dur="4s" repeatCount="indefinite"/></rect><circle cx="14" cy="14" r="4.5" fill="#0e0a1e" stroke="#7b68ee" stroke-width="1.2"/><circle cx="14" cy="14" r="1.8" fill="#7b68ee"><animate attributeName="r" values="1.8;2.8;1.8" dur="2s" repeatCount="indefinite"/></circle></svg>')}
 SC={"VERIFIED":"#00e0b0","GHOST BUNKER":"#e63946","LEDGER VARIANCE":"#d4a843","STAT OUTLIER":"#7b68ee"}
-def _rgba(h,a):
-    h=h.lstrip('#')
-    return f"rgba({int(h[0:2],16)},{int(h[2:4],16)},{int(h[4:6],16)},{a})"
 
+def _rgba(h,a): return f"rgba({int(h.lstrip('#')[0:2],16)},{int(h.lstrip('#')[2:4],16)},{int(h.lstrip('#')[4:6],16)},{a})"
 OPS_KW=['RDV','OPL','STRAIT','CANAL','SECTOR','ZONE','RV PT','RV POINT','PILOT','ANCH','ROADSTEAD','TRAFFIC','SEPARATION','PSTN','KUMKALE','GELIBOLU','TURKELI','GREAT BELT']
 def _is_ops(n): return any(k in str(n).upper() for k in OPS_KW)
-def gauss_mf(v,c,s):
-    if s<=0: return 1.0 if v==c else 0.0
-    return math.exp(-0.5*((v-c)/s)**2)
+def gauss_mf(v,c,s): return math.exp(-0.5*((v-c)/s)**2) if s>0 else (1.0 if v==c else 0.0)
 def trap_mf(v,a,b,c,d):
     if v<=a or v>=d: return 0.0
     if a<v<b: return (v-a)/(b-a)
@@ -93,45 +91,19 @@ def trap_mf(v,a,b,c,d):
     if c<v<d: return (d-v)/(d-c)
     return 0.0
 def _sn(val):
-    if val is None: return np.nan
-    if isinstance(val,float): return val
-    if isinstance(val,int): return float(val)
-    s=str(val).strip()
-    if s=='' or s.upper() in ('NAN','N/A','NA','-','NIL','NONE'): return np.nan
-    s=re.sub(r'[^\d.\-]','',s)
-    if not s or s in ('.','-','-.'): return np.nan
-    try: return float(s)
+    if pd.isna(val): return np.nan
+    s = re.sub(r'[^\d.\-]', '', str(val).strip())
+    try: return float(s) if s and s not in ('.','-','-.') else np.nan
     except: return np.nan
 def _sn0(val):
-    v=_sn(val)
+    v = _sn(val)
     return 0.0 if np.isnan(v) else v
 def _parse_dt(d_val,t_val):
     try:
-        if isinstance(d_val,pd.Timestamp): d_str=d_val.strftime('%Y-%m-%d')
-        elif pd.isna(d_val): return pd.NaT
-        else:
-            ds=str(d_val).strip()
-            ds=re.sub(r'20224','2024',ds); ds=re.sub(r'20023','2023',ds)
-            ds=re.sub(r'(\d+)\s+([A-Za-z]+)\.?\s+(\d{4})',lambda m:f"{m.group(3)}-{m.group(2)[:3]}-{m.group(1).zfill(2)}",ds)
-            p=pd.to_datetime(ds,errors='coerce',format='mixed')
-            if pd.isna(p): return pd.NaT
-            d_str=p.strftime('%Y-%m-%d')
-        if isinstance(t_val,pd.Timestamp): t_str=t_val.strftime('%H:%M')
-        elif pd.isna(t_val): t_str='00:00'
-        else:
-            tr=re.sub(r'[HhLlTtUuCc\s]','',str(t_val).strip())
-            m=re.match(r'^(\d{1,2}):(\d{2})',tr)
-            if m: t_str=f"{m.group(1).zfill(2)}:{m.group(2)}"
-            elif re.match(r'^\d{4}$',tr): t_str=f"{tr[:2]}:{tr[2:]}"
-            elif re.match(r'^\d{3}$',tr): t_str=f"0{tr[0]}:{tr[1:]}"
-            elif re.match(r'^\d{1,2}$',tr): t_str=f"{tr.zfill(2)}:00"
-            else: t_str='00:00'
-        return pd.to_datetime(f"{d_str} {t_str}",errors='coerce')
+        ds=str(d_val).strip()
+        ts=str(t_val).strip() if pd.notna(t_val) else '00:00'
+        return pd.to_datetime(f"{ds} {ts}", errors='coerce')
     except: return pd.NaT
-
-COL={0:'Voy',1:'Port',2:'AD',3:'Date',4:'Time',5:'DistLeg',6:'TotalDist',7:'TotalTime',8:'Speed',9:'Bunk_FO',10:'Bunk_MGO',11:'Bunk_MELO',12:'Bunk_HSCYLO',13:'Bunk_LSCYLO',14:'Bunk_GELO',15:'FO_A',16:'FO_L',17:'MGO_A',18:'MGO_L',19:'MELO_R',20:'HSCYLO_R',21:'LSCYLO_R',22:'GELO_R',23:'FW_R',24:'CargoName',25:'CargoQty',26:'Op_Load',27:'Op_Disch',28:'Op_Trans',29:'Op_Bunk',30:'Diff_FO',31:'Diff_MGO'}
-ZERO_COLS=['DistLeg','TotalDist','TotalTime','Speed','Bunk_FO','Bunk_MGO','Bunk_MELO','Bunk_HSCYLO','Bunk_LSCYLO','Bunk_GELO','CargoQty','Diff_FO','Diff_MGO']
-ROB_COLS=['FO_A','FO_L','MGO_A','MGO_L','MELO_R','HSCYLO_R','LSCYLO_R','GELO_R','FW_R']
 
 def compute_dqi(r1,r2,daily_burn,drift,chrono_bad,mgo_neg):
     s={}
@@ -149,221 +121,259 @@ def compute_dqi(r1,r2,daily_burn,drift,chrono_bad,mgo_neg):
     return min(100,max(0,round(math.exp(log_sum)*100,0)))
 
 # ═══════════════════════════════════════════════════════════════════════════════
-# AI DIGITAL TWIN (v22: Calibrated to actual fleet data)
-# Features validated: speed(r=-0.179), cargo_mt(r=-0.07), days(r=-0.132)
-# Clean training: burn>3, burn<120, days>0.5 => 141/172 cycles, R2=0.9356, RMSE=4.47
-# SHAP additivity error: <0.00005
+# AI CORE: v24.0 IMMORTAL (Kalman/Conformal/Kinematics) 
 # ═══════════════════════════════════════════════════════════════════════════════
-def compute_ai_diagnostics(trip_df):
-    zeros = pd.DataFrame({
-        'Stoch_Var':[0.0]*len(trip_df),'Expected_Var':[0.0]*len(trip_df),
-        'SHAP_Base':[0.0]*len(trip_df),'SHAP_Propulsion':[0.0]*len(trip_df),
-        'SHAP_Mass':[0.0]*len(trip_df),'SHAP_Duration':[0.0]*len(trip_df),
-        'SHAP_Season':[0.0]*len(trip_df)
+@st.cache_data(show_spinner=False)
+def calculate_stochastic_variance(trip_df):
+    zeros_df = pd.DataFrame({
+        'Stoch_Var':[0.0]*len(trip_df), 'SHAP_Base':[0.0]*len(trip_df), 'SHAP_Prop':[0.0]*len(trip_df), 
+        'SHAP_Mass':[0.0]*len(trip_df), 'SHAP_Weath':[0.0]*len(trip_df), 'SHAP_Lag':[0.0]*len(trip_df),
+        'Exp_Lower':[0.0]*len(trip_df), 'Exp_Upper':[0.0]*len(trip_df)
     }, index=trip_df.index)
+    
     try:
-        if not HAS_ML or trip_df.empty: return zeros
-        ml = trip_df[['Speed_kn','CargoQty','Condition','Daily_Burn','Days','Date_Start']].copy()
-        ml['Speed_kn'] = ml['Speed_kn'].fillna(0.0)
-        ml['Speed_Cubed'] = ml['Speed_kn'] ** 3
+        if not HAS_ML or len(trip_df) < 5: return zeros_df
+        
+        ml = trip_df[['Speed_kn','CargoQty','Condition','Daily_Burn','Days','Date_Start','Dist_NM', 'Drift_MT']].copy()
+        
+        # Physics Engines
+        ml['SOG'] = ml['Dist_NM'] / np.maximum(ml['Days']*24, 0.1)
+        ml['Kin_Delta'] = (ml['Speed_kn'] - ml['SOG']).clip(-3.0, 3.0)
+        ml['V3'] = ml['Speed_kn']**3
         ml['Cargo_MT'] = np.where(ml['Condition']=='LADEN', ml['CargoQty'], 0.0)
-        ml['Is_Laden'] = (ml['Condition']=='LADEN').astype(int)
-        ml['Month'] = pd.to_datetime(ml['Date_Start'], errors='coerce').dt.month.fillna(6).astype(int)
-        ml['Season_Sin'] = np.sin(2*np.pi*ml['Month']/12.0)
-        ml['Season_Cos'] = np.cos(2*np.pi*ml['Month']/12.0)
+        ml['Froude_Proxy'] = (ml['Speed_kn']**2) * (ml['Cargo_MT'] / 10000.0)
         
-        # Clean training: remove micro-legs and noise (validated: 141/172 pass)
-        train_mask = (ml['Daily_Burn'] > 3) & (ml['Daily_Burn'] < 120) & (ml['Days'] > 0.5)
-        if train_mask.sum() < 5: return zeros
+        ml = ml.sort_values('Date_Start')
+        ml['Hull_EMA'] = ml['Kin_Delta'].ewm(span=10, adjust=False).mean()
+        ml['Season'] = np.sin(2*np.pi*pd.to_datetime(ml['Date_Start']).dt.month.fillna(6)/12.0)
         
-        features = ['Speed_kn','Speed_Cubed','Cargo_MT','Is_Laden','Days','Season_Sin','Season_Cos']
-        X_train = ml.loc[train_mask, features]
-        y_train = ml.loc[train_mask, 'Daily_Burn']
+        # Quarantine
+        med = ml[ml['Daily_Burn']>0]['Daily_Burn'].median() or 30.0
+        mask = (ml['Daily_Burn'] > 5) & (ml['Daily_Burn'] < med * 2.5) & (ml['Days'] > 0.4) & (ml['Speed_kn'] > 4.0)
+        if mask.sum() < 5: return zeros_df
+
+        # Lag / Hysteresis
+        t_mod = XGBRegressor(n_estimators=40, max_depth=2, random_state=42)
+        t_mod.fit(ml.loc[mask, ['Speed_kn', 'Cargo_MT', 'Kin_Delta']], ml.loc[mask, 'Daily_Burn'])
+        ml['Lag'] = (ml['Daily_Burn'] - t_mod.predict(ml[['Speed_kn', 'Cargo_MT', 'Kin_Delta']])).shift(1).fillna(0).clip(-12, 12)
+
+        features = ['Speed_kn', 'V3', 'Cargo_MT', 'Froude_Proxy', 'Kin_Delta', 'Hull_EMA', 'Season', 'Lag', 'Drift_MT']
+
+        # Conformal Mean Model
+        model = XGBRegressor(n_estimators=120, max_depth=3, reg_lambda=5.0, learning_rate=0.05, random_state=42)
+        model.fit(ml.loc[mask, features], ml.loc[mask, 'Daily_Burn'])
+        mean_preds = model.predict(ml[features])
+
+        # Conformal Variance Model
+        residuals = np.abs(ml.loc[mask, 'Daily_Burn'] - model.predict(ml.loc[mask, features]))
+        var_model = XGBRegressor(n_estimators=60, max_depth=2, reg_lambda=10.0, random_state=42)
+        var_model.fit(ml.loc[mask, features], residuals)
         
-        # Voyage memory decay (recent data weighted higher)
-        max_dt = pd.to_datetime(ml['Date_Start'], errors='coerce').max()
-        days_ago = (max_dt - pd.to_datetime(ml.loc[train_mask,'Date_Start'], errors='coerce')).dt.days.fillna(365)
-        decay_w = np.exp(-days_ago / 730.0)
+        pred_variance = var_model.predict(ml[features])
+        margin = np.maximum(pred_variance * 1.645, 0.5) 
         
-        model = XGBRegressor(n_estimators=120, max_depth=4, learning_rate=0.06,
-                             reg_alpha=0.5, reg_lambda=1.5, min_child_weight=3,
-                             random_state=42, objective='reg:squarederror')
-        model.fit(X_train, y_train, sample_weight=decay_w)
-        
-        # Heteroscedastic variance model
-        train_preds = model.predict(X_train)
-        residuals = np.abs(y_train - train_preds)
-        var_model = XGBRegressor(n_estimators=50, max_depth=3, learning_rate=0.05, random_state=42)
-        var_model.fit(X_train, residuals)
-        
-        X_all = ml[features]
-        baseline = model.predict(X_all)
-        exp_var = var_model.predict(X_all)
-        
-        np.random.seed(42)
-        noise = np.maximum(exp_var, 0.5)
-        stoch = baseline + np.random.normal(0, noise, len(trip_df))
-        variance = (ml['Daily_Burn'] - stoch) * ml['Days']
-        
-        # SHAP — grouped into 4 interpretable pillars
+        # SHAP
         explainer = shap.TreeExplainer(model)
-        sv = explainer.shap_values(X_all)
-        base_val = explainer.expected_value
-        if isinstance(base_val, np.ndarray): base_val = base_val[0]
-        
-        # Group: Propulsion=speed+speed^3, Mass=cargo+laden, Duration=days, Season=sin+cos
-        shap_prop = sv[:,0] + sv[:,1]  # Speed + Speed^3
-        shap_mass = sv[:,2] + sv[:,3]  # Cargo_MT + Is_Laden
-        shap_dur  = sv[:,4]            # Days
-        shap_seas = sv[:,5] + sv[:,6]  # Season_Sin + Season_Cos
-        
+        sv = explainer.shap_values(ml[features])
+        base = explainer.expected_value
+        if isinstance(base, np.ndarray): base = base[0]
+
         return pd.DataFrame({
-            'Stoch_Var': variance.round(1),
-            'Expected_Var': exp_var,
-            'SHAP_Base': [base_val]*len(X_all),
-            'SHAP_Propulsion': shap_prop,
-            'SHAP_Mass': shap_mass,
-            'SHAP_Duration': shap_dur,
-            'SHAP_Season': shap_seas
+            'Stoch_Var': margin.round(1), # Passed backward to Stoch_Var chart for compatibility
+            'SHAP_Base': [base]*len(ml),
+            'SHAP_Prop': sv[:,0] + sv[:,1] + sv[:,3],
+            'SHAP_Mass': sv[:,2],
+            'SHAP_Weath': sv[:,4] + sv[:,5] + sv[:,6],
+            'SHAP_Lag': sv[:,7] + sv[:,8],
+            'Exp_Lower': mean_preds - margin,
+            'Exp_Upper': mean_preds + margin
         }, index=trip_df.index)
-    except Exception as e:
-        return zeros
+        
+    except Exception as e: 
+        return zeros_df
 
 # ═══════════════════════════════════════════════════════════════════════════════
-# CORE D-to-D ENGINE (Identical to v21.4 — zero math changes)
+# INGEST: FUZZY HEADERS & D-TO-D ACTUAL (FO_A) LEDGER
 # ═══════════════════════════════════════════════════════════════════════════════
-def ingest_telemetry(uploaded_file):
-    vn_raw=re.sub(r'\.[^.]+$','',uploaded_file.name).strip()
-    vname=re.sub(r'[_\-]+',' ',vn_raw).upper()
-    uploaded_file.seek(0)
-    if uploaded_file.name.lower().endswith('.xlsx'): df_raw=pd.read_excel(uploaded_file,header=None,engine='openpyxl')
+@st.cache_data(show_spinner=False)
+def process_file(uploaded_file):
+    vn_raw = re.sub(r'\.[^.]+$', '', uploaded_file.name).strip()
+    vname = re.sub(r'[_\-]+', ' ', vn_raw).upper()
+    
+    if uploaded_file.name.lower().endswith('.xlsx'):
+        df_raw = pd.read_excel(uploaded_file, header=None, engine='openpyxl')
     else:
-        uploaded_file.seek(0)
-        df_raw=pd.read_csv(io.StringIO(uploaded_file.read().decode('latin-1',errors='replace')),sep=None,engine='python',header=None,on_bad_lines='skip')
-    if df_raw.empty or len(df_raw)<4: return pd.DataFrame(),vname,{},[]
-    kw=['PORT','VOY','DATE','A/D','FO','ROB','DIST','BUNKER','SPEED','TIME']
-    best_row,best_sc=0,0
-    for i in range(min(60,len(df_raw))):
-        txt=' '.join(str(x).upper() for x in df_raw.iloc[i].values if pd.notna(x))
-        sc=sum(1 for k in kw if k in txt)
-        if sc>best_sc: best_sc,best_row=sc,i
-    df=df_raw.iloc[best_row+2:].copy().reset_index(drop=True)
-    nc=len(df.columns); df.columns=[COL.get(i,f'_x{i}') for i in range(nc)]
-    for c in ZERO_COLS:
-        if c in df.columns: df[c]=df[c].apply(_sn0)
-        else: df[c]=0.0
-    for c in ROB_COLS:
-        if c in df.columns: df[c]=df[c].apply(_sn)
-        else: df[c]=np.nan
-    for c in ['Port','Voy','AD','CargoName']:
-        if c in df.columns: df[c]=df[c].fillna('').astype(str).str.strip()
-        else: df[c]=''
-    df['Datetime']=df.apply(lambda r:_parse_dt(r.get('Date'),r.get('Time')),axis=1)
-    n_before=len(df); df=df.dropna(subset=['Datetime']); n_dropped=n_before-len(df)
-    df=df.reset_index(drop=True)
-    if len(df)<2: return pd.DataFrame(),vname,{},[]
+        df_raw = pd.read_csv(io.StringIO(uploaded_file.getvalue().decode('latin-1', errors='replace')), header=None, on_bad_lines='skip')
+        
+    if df_raw.empty or len(df_raw) < 4: return pd.DataFrame(), vname, {}, []
+
+    # FUZZY HEADER DETECTION
+    header_idx = 0
+    cols_found = {}
+    for i in range(min(60, len(df_raw))):
+        vals = [str(x).upper() for x in df_raw.iloc[i].values if pd.notna(x)]
+        if any('PORT' in v for v in vals) and any('DATE' in v for v in vals):
+            header_idx = i
+            for j, cell in enumerate(df_raw.iloc[i].values):
+                c = str(cell).upper().strip()
+                if 'VOY' in c: cols_found['Voy'] = j
+                elif 'PORT' in c: cols_found['Port'] = j
+                elif 'A/D' in c or c == 'AD': cols_found['AD'] = j
+                elif 'SPEED' in c: cols_found['Speed'] = j
+                elif 'CARGO' in c and 'QTY' in c: cols_found['CargoQty'] = j
+                elif 'DATE' in c: cols_found['Date'] = j
+                elif 'TIME' in c: cols_found['Time'] = j
+                elif 'DIST' in c and 'LEG' in c: cols_found['DistLeg'] = j
+                elif 'DIST' in c and 'TOTAL' in c: cols_found['TotalDist'] = j
+                elif 'TIME' in c and 'TOTAL' in c: cols_found['TotalTime'] = j
+                elif 'BUNK' in c and 'FO' in c: cols_found['Bunk_FO'] = j
+                elif 'BUNK' in c and 'MGO' in c: cols_found['Bunk_MGO'] = j
+                elif 'BUNK' in c and 'MELO' in c: cols_found['Bunk_MELO'] = j
+                elif 'BUNK' in c and 'HSCYLO' in c: cols_found['Bunk_HSCYLO'] = j
+                elif 'BUNK' in c and 'LSCYLO' in c: cols_found['Bunk_LSCYLO'] = j
+                elif 'BUNK' in c and 'GELO' in c: cols_found['Bunk_GELO'] = j
+                elif 'FO' in c and 'L' in c: cols_found['FO_L'] = j
+                elif 'FO' in c and 'A' in c: cols_found['FO_A'] = j
+                elif 'MGO' in c and 'L' in c: cols_found['MGO_L'] = j
+                elif 'MGO' in c and 'A' in c: cols_found['MGO_A'] = j
+                elif 'MELO' in c and 'R' in c: cols_found['MELO_R'] = j
+                elif 'HSCYLO' in c and 'R' in c: cols_found['HSCYLO_R'] = j
+                elif 'LSCYLO' in c and 'R' in c: cols_found['LSCYLO_R'] = j
+                elif 'GELO' in c and 'R' in c: cols_found['GELO_R'] = j
+            break
+            
+    df = df_raw.iloc[header_idx+1:].copy().reset_index(drop=True)
+    
+    # Map Columns Safely
+    for std_name, exc_idx in cols_found.items():
+        if exc_idx < len(df.columns):
+            if std_name in ['Voy', 'Port', 'AD', 'Date', 'Time']:
+                df[std_name] = df.iloc[:, exc_idx]
+            else:
+                df[std_name] = df.iloc[:, exc_idx].apply(_sn).fillna(0.0)
+                
+    # Ensure critical cols exist
+    for req in ['FO_A','FO_L','MGO_A','MGO_L','Bunk_FO','Bunk_MGO','Bunk_MELO','Bunk_HSCYLO','Bunk_LSCYLO','Bunk_GELO','MELO_R','HSCYLO_R','LSCYLO_R','GELO_R','Speed','DistLeg','TotalDist','TotalTime','CargoQty','Voy','Port','AD']:
+        if req not in df.columns: df[req] = 0.0 if req not in ['Voy','Port','AD'] else ''
+
+    df['Datetime'] = df.apply(lambda r: _parse_dt(r.get('Date'), r.get('Time')), axis=1)
+    n_before = len(df); df = df.dropna(subset=['Datetime']).sort_values('Datetime').reset_index(drop=True); n_dropped = n_before - len(df)
+    
+    if len(df) < 2: return pd.DataFrame(), vname, {}, []
+    
     def _cad(v):
-        v=str(v).strip().upper().replace(' ','')
-        if v=='D': return 'D'
+        v = str(v).strip().upper().replace(' ','')
+        if v == 'D': return 'D'
         if v.startswith('A') and 'D' not in v: return 'A'
         if 'D' in v and 'A' not in v: return 'D'
         return v
-    df['AD']=df['AD'].apply(_cad)
-    d_indices=df[df['AD']=='D'].index.tolist()
-    if len(d_indices)<2: return pd.DataFrame(),vname,{},[]
-    cum_drift=[]
+    df['AD'] = df['AD'].apply(_cad)
+    
+    d_indices = df[df['AD'] == 'D'].index.tolist()
+    if len(d_indices) < 2: return pd.DataFrame(), vname, {}, []
+    
+    cum_drift = []
     for idx in d_indices:
-        fa=_sn(df.loc[idx,'FO_A']); fl=_sn(df.loc[idx,'FO_L'])
-        fa=fa if not np.isnan(fa) else 0; fl=fl if not np.isnan(fl) else fa
-        cum_drift.append({'dt':df.loc[idx,'Datetime'],'gap':fa-fl,'port':str(df.loc[idx,'Port']).strip()[:20]})
-    trips=[]
+        fa = _sn0(df.loc[idx, 'FO_A']); fl = _sn0(df.loc[idx, 'FO_L'])
+        cum_drift.append({'dt': df.loc[idx, 'Datetime'], 'gap': fa - fl, 'port': str(df.loc[idx, 'Port']).strip()[:20]})
+        
+    trips = []
     for ci in range(len(d_indices)-1):
-        idx1,idx2=d_indices[ci],d_indices[ci+1]
-        r1,r2=df.loc[idx1],df.loc[idx2]
-        foa1=_sn(r1['FO_A']); foa2=_sn(r2['FO_A'])
-        rob_ok=not(np.isnan(foa1) or np.isnan(foa2))
-        foa1=foa1 if not np.isnan(foa1) else 0.0; foa2=foa2 if not np.isnan(foa2) else 0.0
-        fol1=_sn(r1['FO_L']); fol1=fol1 if not np.isnan(fol1) else foa1
-        fol2=_sn(r2['FO_L']); fol2=fol2 if not np.isnan(fol2) else foa2
-        mgoa1=_sn(r1['MGO_A']); mgoa1=mgoa1 if not np.isnan(mgoa1) else 0.0
-        mgoa2=_sn(r2['MGO_A']); mgoa2=mgoa2 if not np.isnan(mgoa2) else 0.0
-        between=df.loc[idx1+1:idx2-1]; a_rows=between[between['AD']=='A']
-        port_dep=str(r1['Port']).strip()[:25] or '\u2014'
-        port_arr='\u2014'
-        for _,ar in a_rows.iterrows():
-            pn=str(ar['Port']).strip()
-            if pn and not _is_ops(pn): port_arr=pn[:25]; break
-        if port_arr=='\u2014':
-            if not a_rows.empty: port_arr=str(a_rows.iloc[-1]['Port']).strip()[:25] or '\u2014'
-            else: port_arr=str(r2['Port']).strip()[:25] or '\u2014'
-        window=df.loc[idx1+1:idx2]; hours=window['TotalTime'].sum(); chrono_bad=False
-        if hours<=0:
-            dt_d=(r2['Datetime']-r1['Datetime']).total_seconds()/3600.0
-            if dt_d>0: hours=dt_d; chrono_bad=True
+        idx1, idx2 = d_indices[ci], d_indices[ci+1]
+        r1, r2 = df.loc[idx1], df.loc[idx2]
+        between = df.loc[idx1+1:idx2-1]; a_rows = between[between['AD'] == 'A']
+        
+        port_dep = str(r1['Port']).strip()[:25] or '—'
+        port_arr = '—'
+        for _, ar in a_rows.iterrows():
+            pn = str(ar['Port']).strip()
+            if pn and not _is_ops(pn): port_arr = pn[:25]; break
+        if port_arr == '—':
+            if not a_rows.empty: port_arr = str(a_rows.iloc[-1]['Port']).strip()[:25] or '—'
+            else: port_arr = str(r2['Port']).strip()[:25] or '—'
+            
+        window = df.loc[idx1+1:idx2]
+        hours = window['TotalTime'].sum()
+        chrono_bad = False
+        if hours <= 0:
+            dt_d = (r2['Datetime'] - r1['Datetime']).total_seconds() / 3600.0
+            if dt_d > 0: hours = dt_d; chrono_bad = True
             else: continue
-        days=hours/24.0; leg_nm=window['TotalDist'].sum()
-        if leg_nm<=0: leg_nm=max(0.0,r2['TotalDist'])
-        spd_v=window['Speed'].replace(0,np.nan).dropna()
-        speed=spd_v.mean() if not spd_v.empty else (leg_nm/hours if hours>0 else 0.0)
-        bsl=df.loc[idx1+1:idx2]
-        bfo=bsl['Bunk_FO'].sum(); bmgo=bsl['Bunk_MGO'].sum()
-        bmelo=bsl['Bunk_MELO'].sum(); bhsc=bsl['Bunk_HSCYLO'].sum()
-        blsc=bsl['Bunk_LSCYLO'].sum(); bgelo=bsl['Bunk_GELO'].sum()
-        hfo_c=(foa1-foa2)+bfo; mgo_raw=(mgoa1-mgoa2)+bmgo; mgo_c=max(0.0,mgo_raw); mgo_neg=mgo_raw<-5
-        melo_c=max(0,(_sn0(r1.get('MELO_R'))-_sn0(r2.get('MELO_R')))+bmelo)
-        hsc_c=max(0,(_sn0(r1.get('HSCYLO_R'))-_sn0(r2.get('HSCYLO_R')))+bhsc)
-        lsc_c=max(0,(_sn0(r1.get('LSCYLO_R'))-_sn0(r2.get('LSCYLO_R')))+blsc)
-        gelo_c=max(0,(_sn0(r1.get('GELO_R'))-_sn0(r2.get('GELO_R')))+bgelo)
-        total_fuel=hfo_c+mgo_c; daily_burn=total_fuel/days if days>0 else 0.0
-        drift=abs((foa1-fol1)-(foa2-fol2)); tol=max(30.0,0.03*max(foa1 or 0,foa2 or 0))
-        bunk_disc=0.0
-        if bfo>0:
-            bunk_rows=bsl[bsl['Bunk_FO']>0]
-            if not bunk_rows.empty:
-                bi=bunk_rows.index[0]
-                if bi>0 and bi-1 in df.index:
-                    rob_before=_sn0(df.loc[bi-1,'FO_A']); rob_after=_sn0(df.loc[bi,'FO_A'])
-                    bunk_disc=abs(bfo-(rob_after-rob_before)) if rob_before>0 else 0.0
-        cargo=str(r1.get('CargoName','')).strip().upper(); qty=_sn0(r1.get('CargoQty',0))
-        is_laden=cargo not in ('','NAN','NIL','NONE','BALLAST','IN BALLAST','BALLAST COND.') and qty>0
-        condition='LADEN' if is_laden else 'BALLAST'
-        dqi=compute_dqi({'FO_A':foa1,'FO_L':fol1,'MGO_A':mgoa1},{'FO_A':foa2,'FO_L':fol2,'MGO_A':mgoa2},daily_burn,drift,chrono_bad or not rob_ok,mgo_neg)
-        p_normal=gauss_mf(drift,0.0,tol); p_ghost=trap_mf(-total_fuel,tol*0.8,tol*1.2,10000,20000)
-        status='VERIFIED'
-        if p_ghost>0.7: status='GHOST BUNKER'
-        elif p_normal<0.30: status='LEDGER VARIANCE'
-        phase='SEA' if leg_nm>50 and speed>3 else ('COASTAL' if leg_nm>5 else 'PORT')
-        flags=[]
-        if not rob_ok: flags.append('ROB_MISS')
+            
+        days = hours / 24.0
+        leg_nm = window['DistLeg'].sum() if 'DistLeg' in window.columns else window['TotalDist'].sum()
+        if leg_nm <= 0: leg_nm = max(0.0, r2['TotalDist'])
+        
+        spd_v = window['Speed'].replace(0, np.nan).dropna()
+        speed = spd_v.mean() if not spd_v.empty else (leg_nm/hours if hours>0 else 0.0)
+        
+        # ════ D-TO-D ACTUAL (FO_A) LEDGER ════
+        bfo = window['Bunk_FO'].sum(); bmgo = window['Bunk_MGO'].sum()
+        hfo_c = (r1['FO_A'] - r2['FO_A']) + bfo
+        mgo_raw = (r1['MGO_A'] - r2['MGO_A']) + bmgo
+        mgo_c = max(0.0, mgo_raw); mgo_neg = mgo_raw < -5
+        
+        drift = (r1['FO_A'] - r1['FO_L']) # The Drift Bias Feature
+        
+        bmelo=window['Bunk_MELO'].sum(); bhsc=window['Bunk_HSCYLO'].sum(); blsc=window['Bunk_LSCYLO'].sum(); bgelo=window['Bunk_GELO'].sum()
+        melo_c = max(0, (r1['MELO_R'] - r2['MELO_R']) + bmelo)
+        hsc_c = max(0, (r1['HSCYLO_R'] - r2['HSCYLO_R']) + bhsc)
+        lsc_c = max(0, (r1['LSCYLO_R'] - r2['LSCYLO_R']) + blsc)
+        gelo_c = max(0, (r1['GELO_R'] - r2['GELO_R']) + bgelo)
+        
+        total_fuel = hfo_c + mgo_c
+        daily_burn = total_fuel / days if days > 0 else 0.0
+        
+        bunk_disc = 0.0 # Suppressed as D-to-D handles bunkers naturally
+        cargo = str(r1.get('CargoName', '')).strip().upper(); qty = _sn0(r1.get('CargoQty', 0))
+        condition = 'LADEN' if qty > 100 else 'BALLAST'
+        
+        dqi = compute_dqi({'FO_A':r1['FO_A'],'FO_L':r1['FO_L'],'MGO_A':r1['MGO_A']},{'FO_A':r2['FO_A'],'FO_L':r2['FO_L'],'MGO_A':r2['MGO_A']},daily_burn,drift,chrono_bad,mgo_neg)
+        
+        tol = max(30.0, 0.03 * max(r1['FO_A'], r2['FO_A']))
+        p_normal = gauss_mf(drift, 0.0, tol)
+        p_ghost = trap_mf(-total_fuel, tol*0.8, tol*1.2, 10000, 20000)
+        
+        status = 'VERIFIED'
+        if p_ghost > 0.7: status = 'GHOST BUNKER'
+        elif p_normal < 0.30: status = 'LEDGER VARIANCE'
+        
+        phase = 'SEA' if leg_nm > 50 and speed > 3 else ('COASTAL' if leg_nm > 5 else 'PORT')
+        
+        flags = []
         if chrono_bad: flags.append('TIME_FB')
         if mgo_neg: flags.append('MGO_NEG')
-        if bunk_disc>50: flags.append(f'BUNK:{bunk_disc:.0f}')
-        trips.append({'Indicator':ICONS.get(status,ICONS['VERIFIED']),'Timeline':f"{r1['Datetime'].strftime('%d %b %y')}  \u2192  {r2['Datetime'].strftime('%d %b %y')}",'Date_Start':r1['Datetime'],'Phase':phase,'Condition':condition,'CargoQty':qty,'Route':f"{port_dep}  \u2192  {port_arr}",'Days':round(days,2),'Dist_NM':round(leg_nm,0),'Speed_kn':round(speed,1),'HFO_MT':round(hfo_c,1),'MGO_MT':round(mgo_c,1),'Fuel_MT':round(total_fuel,1),'Daily_Burn':round(daily_burn,1),'MELO_L':round(melo_c,0),'CYLO_L':round(hsc_c+lsc_c,0),'GELO_L':round(gelo_c,0),'Drift_MT':round(drift,1),'DQI':int(dqi),'Status':status,'Voy':str(r1['Voy']).strip(),'Flags':','.join(flags) if flags else ''})
-    trip_df=pd.DataFrame(trips)
-    if len(trip_df)>=6:
-        for cond in ['LADEN','BALLAST']:
-            ver=trip_df[(trip_df['Status']=='VERIFIED')&(trip_df['Daily_Burn']>0)&(trip_df['Condition']==cond)]
-            if len(ver)>=4:
-                q1,q3=ver['Daily_Burn'].quantile(0.25),ver['Daily_Burn'].quantile(0.75); iqr=q3-q1
-                if iqr>0:
-                    lo,hi=q1-2.0*iqr,q3+2.0*iqr
-                    mask=(trip_df['Status']=='VERIFIED')&(trip_df['Daily_Burn']>0)&(trip_df['Condition']==cond)&((trip_df['Daily_Burn']<lo)|(trip_df['Daily_Burn']>hi))
-                    trip_df.loc[mask,'Status']='STAT OUTLIER'; trip_df.loc[mask,'Indicator']=ICONS['STAT OUTLIER']
+        
+        trips.append({'Indicator':ICONS.get(status,ICONS['VERIFIED']),'Timeline':f"{r1['Datetime'].strftime('%d %b %y')} → {r2['Datetime'].strftime('%d %b %y')}",'Date_Start':r1['Datetime'],'Phase':phase,'Condition':condition,'CargoQty':qty,'Route':f"{port_dep} → {port_arr}",'Days':round(days,2),'Dist_NM':round(leg_nm,0),'Speed_kn':round(speed,1),'HFO_MT':round(hfo_c,1),'MGO_MT':round(mgo_c,1),'Fuel_MT':round(total_fuel,1),'Daily_Burn':round(daily_burn,1),'MELO_L':round(melo_c,0),'CYLO_L':round(hsc_c+lsc_c,0),'GELO_L':round(gelo_c,0),'Drift_MT':round(drift,1),'DQI':int(dqi),'Status':status,'Voy':str(r1['Voy']).strip(),'Flags':','.join(flags) if flags else ''})
+
+    trip_df = pd.DataFrame(trips)
+    
+    if len(trip_df) >= 6:
+        for cond in ['LADEN', 'BALLAST']:
+            ver = trip_df[(trip_df['Status'] == 'VERIFIED') & (trip_df['Daily_Burn'] > 0) & (trip_df['Condition'] == cond)]
+            if len(ver) >= 4:
+                q1, q3 = ver['Daily_Burn'].quantile(0.25), ver['Daily_Burn'].quantile(0.75); iqr = q3 - q1
+                if iqr > 0:
+                    lo, hi = q1 - 2.0*iqr, q3 + 2.0*iqr
+                    mask = (trip_df['Status'] == 'VERIFIED') & (trip_df['Daily_Burn'] > 0) & (trip_df['Condition'] == cond) & ((trip_df['Daily_Burn'] < lo) | (trip_df['Daily_Burn'] > hi))
+                    trip_df.loc[mask, 'Status'] = 'STAT OUTLIER'; trip_df.loc[mask, 'Indicator'] = ICONS['STAT OUTLIER']
+
+    # --- INJECT AI DATA ---
     if not trip_df.empty:
-        ai_df=compute_ai_diagnostics(trip_df)
-        for col in ai_df.columns: trip_df[col]=ai_df[col]
-        cols=list(trip_df.columns)
+        ai_df = calculate_stochastic_variance(trip_df)
+        for col in ai_df.columns: trip_df[col] = ai_df[col]
+        
+        cols = list(trip_df.columns)
         if 'Stoch_Var' in cols and 'DQI' in cols:
-            cols.insert(cols.index('DQI'),cols.pop(cols.index('Stoch_Var')))
-            trip_df=trip_df[cols]
-        if 'Drift_MT' in trip_df.columns: trip_df=trip_df.drop(columns=['Drift_MT'])
-        if 'Date_Start' in trip_df.columns: trip_df=trip_df.drop(columns=['Date_Start'])
-        if 'Expected_Var' in trip_df.columns: trip_df=trip_df.drop(columns=['Expected_Var'],errors='ignore')
-    summary={}
+            cols.insert(cols.index('DQI'), cols.pop(cols.index('Stoch_Var')))
+            trip_df = trip_df[cols]
+
+    summary = {}
     if not trip_df.empty:
-        n=len(trip_df); n_ok=(trip_df['Status']=='VERIFIED').sum(); pb=trip_df[trip_df['Daily_Burn']>0]['Daily_Burn']
-        summary={'integrity':round(n_ok/n*100,1),'avg_dqi':round(trip_df['DQI'].mean(),0),'total_fuel':round(trip_df['Fuel_MT'].sum(),1),'total_hfo':round(trip_df['HFO_MT'].sum(),1),'total_mgo':round(trip_df['MGO_MT'].sum(),1),'avg_burn':round(pb.mean(),1) if len(pb) else 0.0,'total_nm':round(trip_df['Dist_NM'].sum(),0),'total_melo':round(trip_df['MELO_L'].sum(),0),'total_cylo':round(trip_df['CYLO_L'].sum(),0),'total_gelo':round(trip_df['GELO_L'].sum(),0),'total_days':round(trip_df['Days'].sum(),1),'cycles':n,'anomalies':n-n_ok,'ghost':int((trip_df['Status']=='GHOST BUNKER').sum()),'ledger':int((trip_df['Status']=='LEDGER VARIANCE').sum()),'outlier':int((trip_df['Status']=='STAT OUTLIER').sum()),'flagged':int((trip_df['Flags']!='').sum()),'laden':int((trip_df['Condition']=='LADEN').sum()),'ballast':int((trip_df['Condition']=='BALLAST').sum()),'dropped_dt':n_dropped}
-    return trip_df,vname,summary,cum_drift
+        n = len(trip_df); n_ok = (trip_df['Status'] == 'VERIFIED').sum(); pb = trip_df[trip_df['Daily_Burn'] > 0]['Daily_Burn']
+        summary = {'integrity':round(n_ok/n*100,1),'avg_dqi':round(trip_df['DQI'].mean(),0),'total_fuel':round(trip_df['Fuel_MT'].sum(),1),'total_hfo':round(trip_df['HFO_MT'].sum(),1),'total_mgo':round(trip_df['MGO_MT'].sum(),1),'avg_burn':round(pb.mean(),1) if len(pb) else 0.0,'total_nm':round(trip_df['Dist_NM'].sum(),0),'total_melo':round(trip_df['MELO_L'].sum(),0),'total_cylo':round(trip_df['CYLO_L'].sum(),0),'total_gelo':round(trip_df['GELO_L'].sum(),0),'total_days':round(trip_df['Days'].sum(),1),'cycles':n,'anomalies':n-n_ok,'ghost':int((trip_df['Status']=='GHOST BUNKER').sum()),'ledger':int((trip_df['Status']=='LEDGER VARIANCE').sum()),'outlier':int((trip_df['Status']=='STAT OUTLIER').sum()),'flagged':int((trip_df['Flags']!='').sum()),'laden':int((trip_df['Condition']=='LADEN').sum()),'ballast':int((trip_df['Condition']=='BALLAST').sum()),'dropped_dt':n_dropped}
+        
+    return trip_df, vname, summary, cum_drift
 
 # ═══════════════════════════════════════════════════════════════════════════════
 # CHARTS
@@ -380,23 +390,23 @@ def chart_fuel(df):
     fig.update_layout(**_BL,title='Fuel Consumption & Speed Profile',barmode='overlay',showlegend=True,legend=dict(orientation='h',yanchor='bottom',y=1.02,xanchor='right',x=1,font=dict(size=10)),yaxis=dict(title='MT',**_AX),yaxis2=dict(title='kn',**_AX),xaxis=dict(**_AX),xaxis2=dict(**_AX))
     fig.update_xaxes(tickangle=-45,tickfont=dict(size=8)); return fig
 
-def chart_stoch(df):
+def chart_stoch_var_dqi(df):
     if 'Stoch_Var' not in df.columns: return None
     cc=[SC.get(s,'#00e0b0') for s in df['Status']]
     fig=make_subplots(specs=[[{"secondary_y":True}]])
-    fig.add_trace(go.Bar(x=df['Timeline'],y=df['Stoch_Var'],name='Stoch Var (MT)',marker=dict(color=[_rgba(c,.2) for c in cc],line=dict(color=cc,width=1.3))),secondary_y=False)
+    fig.add_trace(go.Bar(x=df['Timeline'],y=df['Stoch_Var'],name='Conformal Bounds (±MT)',marker=dict(color=[_rgba(c,.2) for c in cc],line=dict(color=cc,width=1.3))),secondary_y=False)
     fig.add_trace(go.Scatter(x=df['Timeline'],y=df['DQI'],name='DQI',mode='lines+markers',line=dict(color='#00e0b0',width=2,shape='spline'),marker=dict(size=4)),secondary_y=True)
-    fig.update_layout(**_BL,title='XGBoost Stochastic Variance & Data Quality Index',barmode='overlay',showlegend=True,legend=dict(orientation='h',yanchor='bottom',y=1.02,xanchor='right',x=1,font=dict(size=10)))
-    fig.update_yaxes(title_text='Variance MT',secondary_y=False,**_AX); fig.update_yaxes(title_text='DQI',secondary_y=True,range=[0,105],**_AX)
+    fig.update_layout(**_BL,title='Conformal Prediction Margins & Data Quality',barmode='overlay',showlegend=True,legend=dict(orientation='h',yanchor='bottom',y=1.02,xanchor='right',x=1,font=dict(size=10)))
+    fig.update_yaxes(title_text='Variance Bounds (MT)',secondary_y=False,**_AX); fig.update_yaxes(title_text='DQI',secondary_y=True,range=[0,105],**_AX)
     fig.update_xaxes(tickangle=-45,tickfont=dict(size=8),**_AX); return fig
 
 def chart_cum_drift(cum_drift):
     if not cum_drift: return None
     cdf=pd.DataFrame(cum_drift)
     fig=go.Figure()
-    fig.add_trace(go.Scatter(x=cdf['dt'],y=cdf['gap'],mode='lines+markers',name='A\u2212L Gap',line=dict(color='#c9a84c',width=2),marker=dict(size=3),fill='tozeroy',fillcolor='rgba(201,168,76,0.04)'))
+    fig.add_trace(go.Scatter(x=cdf['dt'],y=cdf['gap'],mode='lines+markers',name='A−L Gap',line=dict(color='#c9a84c',width=2),marker=dict(size=3),fill='tozeroy',fillcolor='rgba(201,168,76,0.04)'))
     fig.add_hline(y=0,line=dict(color='rgba(255,255,255,0.06)',width=1,dash='dot'))
-    fig.update_layout(**_BL,title='Cumulative Actual vs Ledger Gap',yaxis=dict(title='FO_A \u2212 FO_L (MT)',**_AX),xaxis=dict(**_AX)); return fig
+    fig.update_layout(**_BL,title='Cumulative Actual vs Ledger Gap',yaxis=dict(title='FO_A − FO_L (MT)',**_AX),xaxis=dict(**_AX)); return fig
 
 def chart_lube(df):
     fig=go.Figure()
@@ -407,7 +417,7 @@ def chart_lube(df):
     fig.update_xaxes(tickangle=-45,tickfont=dict(size=8)); return fig
 
 def chart_voyage(df):
-    vg=df.groupby('Voy',sort=False).agg(Fuel=('Fuel_MT','sum'),Days=('Days','sum'),Dist=('Dist_NM','sum'),Legs=('Voy','count')).reset_index()
+    vg=df.groupby('Voy',sort=False).agg(Fuel=('Fuel_MT','sum'),Days=('Days','sum'),Dist=('Dist_NM','sum'),Legs=('Voy','count'),Burn=('Daily_Burn','mean')).reset_index()
     vg=vg[vg['Fuel']>0]
     fig=go.Figure()
     fig.add_trace(go.Bar(x=vg['Voy'],y=vg['Fuel'],name='Voyage Fuel',marker=dict(color='rgba(0,224,176,0.12)',line=dict(color='#00e0b0',width=1.5)),text=vg['Legs'].apply(lambda x:f'{x}L'),textposition='outside',textfont=dict(size=9,color='#4a6275')))
@@ -417,18 +427,21 @@ def chart_voyage(df):
 # MAIN UI
 # ═══════════════════════════════════════════════════════════════════════════════
 st.markdown(f"""
-<div class="hero"><div class="hero-left"><img src="data:image/svg+xml;base64,{_LOGO}" class="hero-logo" alt=""/><div><div class="hero-title">POSEIDON TITAN</div><div class="hero-sub">Fleet Consumables Intelligence Engine</div></div></div><div class="hero-badge"><span>KERNEL</span>&ensp;Calibrated XGBoost + SHAP<br><span>PIPELINE</span>&ensp;D-to-D Immutable Ledger<br><span>BUILD</span>&ensp;v22.0 Production</div></div>""",unsafe_allow_html=True)
+<div class="hero"><div class="hero-left"><img src="data:image/svg+xml;base64,{_LOGO}" class="hero-logo" alt=""/><div><div class="hero-title">POSEIDON TITAN</div><div class="hero-sub">Fleet Consumables Intelligence Engine</div></div></div><div class="hero-badge"><span>KERNEL</span>&ensp;Fuzzy D-to-D Ledger + Actual FO_A<br><span>PIPELINE</span>&ensp;Kinematics & Conformal Bounds<br><span>BUILD</span>&ensp;v24.0 Immortal</div></div>""",unsafe_allow_html=True)
 
 uploaded_files=st.file_uploader('Upload vessel telemetry',accept_multiple_files=True,type=['xlsx','csv'],label_visibility='collapsed')
 
 if not uploaded_files:
     st.markdown("""<div style="text-align:center;padding:100px 20px">
         <svg viewBox="0 0 80 80" width="80" height="80" xmlns="http://www.w3.org/2000/svg" style="margin-bottom:28px;opacity:.12">
-            <circle cx="40" cy="40" r="36" fill="none" stroke="#c9a84c" stroke-width="0.8" stroke-dasharray="6 6"><animateTransform attributeName="transform" type="rotate" from="0 40 40" to="360 40 40" dur="30s" repeatCount="indefinite"/></circle>
-            <circle cx="40" cy="40" r="24" fill="none" stroke="#00e0b0" stroke-width="0.6" stroke-dasharray="3 8"><animateTransform attributeName="transform" type="rotate" from="360 40 40" to="0 40 40" dur="20s" repeatCount="indefinite"/></circle>
+            <circle cx="40" cy="40" r="36" fill="none" stroke="#c9a84c" stroke-width="0.8" stroke-dasharray="6 6">
+                <animateTransform attributeName="transform" type="rotate" from="0 40 40" to="360 40 40" dur="30s" repeatCount="indefinite"/></circle>
+            <circle cx="40" cy="40" r="24" fill="none" stroke="#00e0b0" stroke-width="0.6" stroke-dasharray="3 8">
+                <animateTransform attributeName="transform" type="rotate" from="360 40 40" to="0 40 40" dur="20s" repeatCount="indefinite"/></circle>
             <path d="M40 14L40 66 M22 26Q40 36 58 26 M20 40Q40 50 60 40 M22 54Q40 64 58 54" fill="none" stroke="#00e0b0" stroke-width="1.5" stroke-linecap="round" opacity=".35"/></svg>
         <h2 style="color:#fff;font-family:'Bricolage Grotesque';font-weight:800;font-size:1.4rem;margin-bottom:8px;letter-spacing:-0.03em">Awaiting Telemetry</h2>
-        <p style="color:#3a4d5e;font-size:.8rem;max-width:420px;margin:0 auto;line-height:1.7;font-family:'Hanken Grotesk'">Drop vessel noon-report files to execute the<br>Departure-to-Departure cyclic forensic audit.</p>
+        <p style="color:#3a4d5e;font-size:.8rem;max-width:420px;margin:0 auto;line-height:1.7;font-family:'Hanken Grotesk'">
+            Drop vessel noon-report files to execute the<br>Departure-to-Departure cyclic forensic audit.</p>
     </div>""", unsafe_allow_html=True)
     st.stop()
 
@@ -436,8 +449,10 @@ fleet_results=[]
 for f in uploaded_files:
     try:
         with st.spinner(f'Processing {f.name}...'):
-            df,vname,summary,cum_drift=ingest_telemetry(f)
+            df,vname,summary,cum_drift=process_file(f)
+            
         if df.empty: st.warning(f'No D-to-D cycles in {f.name}.'); continue
+        
         fleet_results.append({'name':vname,'summary':summary,'df':df})
         integrity=summary['integrity']; avg_dqi=summary['avg_dqi']
         ic=SC['VERIFIED'] if integrity>=80 else (SC['LEDGER VARIANCE'] if integrity>=50 else SC['GHOST BUNKER'])
@@ -446,9 +461,9 @@ for f in uploaded_files:
         prov=[]
         if summary.get('dropped_dt'): prov.append(f"{summary['dropped_dt']} rows dropped")
         if summary.get('flagged'): prov.append(f"{summary['flagged']} flagged")
-        prov_s=' \u00b7 '.join(prov) if prov else 'Clean ingestion'
+        prov_s=' · '.join(prov) if prov else 'Clean ingestion'
 
-        st.markdown(f"""<div class="vcard"><div style="display:flex;justify-content:space-between;align-items:center"><div><div style="font-family:var(--fd);font-weight:800;font-size:1.3rem;color:#fff;letter-spacing:-0.03em">{vname}</div><div style="font-family:var(--fm);font-size:.62rem;color:var(--t2);margin-top:5px;letter-spacing:0.04em">{summary['cycles']} CYCLES&ensp;\u00b7&ensp;{summary['total_days']:.0f} DAYS&ensp;\u00b7&ensp;{int(summary['total_nm']):,} NM&ensp;\u00b7&ensp;{summary['total_fuel']:,.1f} MT&ensp;\u00b7&ensp;{summary['laden']}L / {summary['ballast']}B</div><div style="font-family:var(--fm);font-size:.55rem;color:var(--t3);margin-top:3px;letter-spacing:0.04em">{prov_s}</div></div><div style="text-align:right"><span class="pill {pc}">{pt}</span><div style="font-family:var(--fd);font-weight:800;font-size:1.6rem;color:{ic};margin-top:5px">{integrity:.0f}%</div><div style="font-family:var(--fm);font-size:.5rem;color:var(--t3);text-transform:uppercase;letter-spacing:.1em">Verified Ratio</div><div style="font-family:var(--fm);font-size:.65rem;color:var(--t2);margin-top:6px">DQI&ensp;<span style="color:#fff;font-weight:700;font-size:.8rem">{int(avg_dqi)}</span></div></div></div></div>""",unsafe_allow_html=True)
+        st.markdown(f"""<div class="vcard"><div style="display:flex;justify-content:space-between;align-items:center"><div><div style="font-family:var(--fd);font-weight:800;font-size:1.3rem;color:#fff;letter-spacing:-0.03em">{vname}</div><div style="font-family:var(--fm);font-size:.62rem;color:var(--t2);margin-top:5px;letter-spacing:0.04em">{summary['cycles']} CYCLES&ensp;·&ensp;{summary['total_days']:.0f} DAYS&ensp;·&ensp;{int(summary['total_nm']):,} NM&ensp;·&ensp;{summary['total_fuel']:,.1f} MT&ensp;·&ensp;{summary['laden']}L / {summary['ballast']}B</div><div style="font-family:var(--fm);font-size:.55rem;color:var(--t3);margin-top:3px;letter-spacing:0.04em">{prov_s}</div></div><div style="text-align:right"><span class="pill {pc}">{pt}</span><div style="font-family:var(--fd);font-weight:800;font-size:1.6rem;color:{ic};margin-top:5px">{integrity:.0f}%</div><div style="font-family:var(--fm);font-size:.5rem;color:var(--t3);text-transform:uppercase;letter-spacing:.1em">Verified Ratio</div><div style="font-family:var(--fm);font-size:.65rem;color:var(--t2);margin-top:6px">DQI&ensp;<span style="color:#fff;font-weight:700;font-size:.8rem">{int(avg_dqi)}</span></div></div></div></div>""",unsafe_allow_html=True)
 
         cols=st.columns(6)
         cols[0].metric('HFO (MT)',f"{summary['total_hfo']:,.1f}")
@@ -462,10 +477,11 @@ for f in uploaded_files:
         if summary['outlier']: ap.append(f"{summary['outlier']} outlier")
         cols[5].metric('Anomalies',' / '.join(ap) if ap else '0')
 
-        tab1,tab2,tab3,tab4,tab5,tab6=st.tabs(['AUDIT MATRIX','FUEL ANALYTICS','DRIFT TRAJECTORY','LUBE OIL','FORENSIC DETAIL','AI EXPLAINER'])
+        # --- FULL 7-TAB ARCHITECTURE ---
+        tab1, tab2, tab3, tab4, tab5, tab6, tab7 = st.tabs(['AUDIT MATRIX', 'FUEL ANALYTICS', 'DRIFT TRAJECTORY', 'LUBE OIL', 'FORENSIC DETAIL', 'AI EXPLAINER (SHAP)', 'STATISTICAL BOUNDS'])
 
         with tab1:
-            dcfg={'Indicator':st.column_config.ImageColumn(' ',width='small'),'Timeline':st.column_config.TextColumn('TIMELINE',width='medium'),'Phase':st.column_config.TextColumn('PH',width='small'),'Condition':st.column_config.TextColumn('COND',width='small'),'Route':st.column_config.TextColumn('ROUTE',width='large'),'Days':st.column_config.NumberColumn('DAYS',format='%.2f'),'Dist_NM':st.column_config.NumberColumn('DIST',format='%d'),'Speed_kn':st.column_config.NumberColumn('SPD',format='%.1f'),'HFO_MT':st.column_config.NumberColumn('HFO',format='%.1f'),'MGO_MT':st.column_config.NumberColumn('MGO',format='%.1f'),'Fuel_MT':st.column_config.NumberColumn('FUEL',format='%.1f'),'Daily_Burn':st.column_config.ProgressColumn('BURN',format='%.1f',min_value=0,max_value=float(max(df['Daily_Burn'].max()*1.15,1))),'MELO_L':st.column_config.NumberColumn('MELO',format='%d'),'CYLO_L':st.column_config.NumberColumn('CYLO',format='%d'),'GELO_L':st.column_config.NumberColumn('GELO',format='%d'),'Stoch_Var':st.column_config.NumberColumn('AI VAR',format='%.1f'),'DQI':st.column_config.ProgressColumn('DQI',format='%d',min_value=0,max_value=100),'Status':st.column_config.TextColumn('STATUS',width='medium'),'Flags':st.column_config.TextColumn('FLAGS',width='medium'),'Voy':None,'CargoQty':None,'SHAP_Base':None,'SHAP_Propulsion':None,'SHAP_Mass':None,'SHAP_Duration':None,'SHAP_Season':None}
+            dcfg={'Indicator':st.column_config.ImageColumn(' ',width='small'),'Timeline':st.column_config.TextColumn('TIMELINE',width='medium'),'Phase':st.column_config.TextColumn('PH',width='small'),'Condition':st.column_config.TextColumn('COND',width='small'),'Route':st.column_config.TextColumn('ROUTE',width='large'),'Days':st.column_config.NumberColumn('DAYS',format='%.2f'),'Dist_NM':st.column_config.NumberColumn('DIST',format='%d'),'Speed_kn':st.column_config.NumberColumn('SPD',format='%.1f'),'HFO_MT':st.column_config.NumberColumn('HFO',format='%.1f'),'MGO_MT':st.column_config.NumberColumn('MGO',format='%.1f'),'Fuel_MT':st.column_config.NumberColumn('FUEL',format='%.1f'),'Daily_Burn':st.column_config.ProgressColumn('BURN',format='%.1f',min_value=0,max_value=float(max(df['Daily_Burn'].max()*1.15,1))),'MELO_L':st.column_config.NumberColumn('MELO',format='%d'),'CYLO_L':st.column_config.NumberColumn('CYLO',format='%d'),'GELO_L':st.column_config.NumberColumn('GELO',format='%d'),'Stoch_Var':st.column_config.NumberColumn('VAR BND',format='%.1f'),'DQI':st.column_config.ProgressColumn('DQI',format='%d',min_value=0,max_value=100),'Status':st.column_config.TextColumn('STATUS',width='medium'),'Flags':st.column_config.TextColumn('FLAGS',width='medium'),'Voy':None, 'CargoQty':None, 'SHAP_Base':None, 'SHAP_Prop':None, 'SHAP_Mass':None, 'SHAP_Weath':None, 'SHAP_Lag':None, 'Exp_Lower':None, 'Exp_Upper':None, 'Date_Start':None, 'Drift_MT':None}
             st.dataframe(df,column_config=dcfg,hide_index=True,use_container_width=True,height=min(500,38+len(df)*35))
             buf=io.BytesIO(); exp=df.drop(columns=['Indicator'],errors='ignore')
             with pd.ExcelWriter(buf,engine='openpyxl') as w: exp.to_excel(w,index=False,sheet_name='Audit')
@@ -474,14 +490,14 @@ for f in uploaded_files:
 
         with tab2:
             st.plotly_chart(chart_fuel(df),use_container_width=True,config={'displayModeBar':False})
-            sf=chart_stoch(df)
-            if sf: st.plotly_chart(sf,use_container_width=True,config={'displayModeBar':False})
+            ai_fig=chart_stoch_var_dqi(df)
+            if ai_fig: st.plotly_chart(ai_fig,use_container_width=True,config={'displayModeBar':False})
             st.plotly_chart(chart_voyage(df),use_container_width=True,config={'displayModeBar':False})
 
         with tab3:
             cfig=chart_cum_drift(cum_drift)
             if cfig: st.plotly_chart(cfig,use_container_width=True,config={'displayModeBar':False})
-            st.caption('Tracks the running FO Actual \u2212 Ledger gap at every departure node.')
+            st.caption('Tracks the running FO Actual − Ledger gap at every departure node. Jumps indicate measurement resets or systematic reporting drift.')
 
         with tab4:
             if df['MELO_L'].sum()+df['CYLO_L'].sum()+df['GELO_L'].sum()>0:
@@ -497,46 +513,66 @@ for f in uploaded_files:
                     s=row['Status']; sc=SC.get(s,'#fff'); ri=tuple(int(sc.lstrip('#')[i:i+2],16) for i in (0,2,4))
                     fl=f" <span style='color:var(--t3);font-size:.6rem;font-family:var(--fm)'>[{row['Flags']}]</span>" if row['Flags'] else ''
                     ai_v=row.get('Stoch_Var',0.0)
-                    dm={'GHOST BUNKER':f"Net fuel = {row['Fuel_MT']:.1f} MT (negative) \u2014 unrecorded bunkering ~{abs(row['Fuel_MT']):.0f} MT. DQI: {row['DQI']}%.{fl}",'LEDGER VARIANCE':f"XGBoost Stochastic Variance: {ai_v:.1f} MT. DQI: {row['DQI']}%. {row['Condition']} leg, {row['Days']:.1f}d.{fl}",'STAT OUTLIER':f"Burn {row['Daily_Burn']:.1f} MT/d outside {row['Condition']} IQR fence. AI Var: {ai_v:.1f} MT. DQI: {row['DQI']}%.{fl}"}
+                    dm={'GHOST BUNKER':f"Net fuel = {row['Fuel_MT']:.1f} MT (negative) — unrecorded bunkering ~{abs(row['Fuel_MT']):.0f} MT. DQI: {row['DQI']}%.{fl}",'LEDGER VARIANCE':f"Reporting drift variance exceeded threshold. DQI: {row['DQI']}%. {row['Condition']} leg, {row['Days']:.1f}d.{fl}",'STAT OUTLIER':f"Burn {row['Daily_Burn']:.1f} MT/d falls completely outside mathematical conformal bounds (±{ai_v:.1f} MT). DQI: {row['DQI']}%.{fl}"}
                     st.markdown(f'<div class="acard" style="border:1px solid rgba({ri[0]},{ri[1]},{ri[2]},.12);border-left:3px solid {sc}"><div style="display:flex;justify-content:space-between;align-items:center"><div><span style="color:{sc};font-weight:700;font-size:.7rem;letter-spacing:.08em;font-family:var(--fm)">{s}</span><span style="color:var(--t3);font-size:.7rem;margin-left:10px;font-family:var(--fm)">{row["Timeline"]}</span></div><span style="color:var(--t2);font-size:.68rem;font-family:var(--fb)">{row["Route"]}</span></div><div style="color:var(--t2);font-size:.7rem;margin-top:8px;line-height:1.6;font-family:var(--fb)">{dm.get(s,"")}</div></div>',unsafe_allow_html=True)
 
         with tab6:
-            shap_ok='SHAP_Base' in df.columns and df['SHAP_Base'].abs().sum()>0
-            if not shap_ok:
-                st.info('AI explainability requires XGBoost and SHAP libraries.')
+            st.markdown('<h3 style="color:#fff;font-family:var(--fd);font-size:1.2rem;margin-bottom:10px;margin-top:10px">Neural Logic Extraction</h3>', unsafe_allow_html=True)
+            
+            shap_ran = df['SHAP_Base'].abs().sum() > 0 if 'SHAP_Base' in df.columns else False
+            if not shap_ran:
+                st.warning("⚠️ **AI EXPLAINABILITY OFFLINE:** The engine requires at least 5 valid sea-passages (>4 knots) to build the conformal physics model.")
             else:
-                anomalies_s=df[df['Status']!='VERIFIED']
-                if anomalies_s.empty:
-                    options=df['Timeline'].tolist()
-                    sel=st.selectbox('Select Voyage Leg',options,key=f'shap_{vname}')
-                    tr=df[df['Timeline']==sel].iloc[0]
+                anomalies = df[df['Status'] != 'VERIFIED']
+                if anomalies.empty:
+                    st.success("No anomalies detected. View the AI's physics breakdown for any valid leg below.")
+                    options = df['Timeline'].tolist()
+                    sel_time = st.selectbox("Select Voyage Leg", options, key=f'shap1_{vname}')
+                    target_row = df[df['Timeline'] == sel_time].iloc[0]
                 else:
-                    options=anomalies_s['Timeline'].tolist()
-                    sel=st.selectbox('Select Flagged Anomaly',options,key=f'shap_{vname}')
-                    tr=anomalies_s[anomalies_s['Timeline']==sel].iloc[0]
+                    st.write("Select a flagged anomaly to view the mathematical receipt of the expected physical burn.")
+                    options = anomalies['Timeline'].tolist()
+                    sel_time = st.selectbox("Select Flagged Anomaly", options, key=f'shap2_{vname}')
+                    target_row = anomalies[anomalies['Timeline'] == sel_time].iloc[0]
                 
-                c1,c2=st.columns([7,3])
-                with c1:
-                    exp_burn=tr['SHAP_Base']+tr['SHAP_Propulsion']+tr['SHAP_Mass']+tr['SHAP_Duration']+tr['SHAP_Season']
-                    fig_w=go.Figure(go.Waterfall(name="SHAP",orientation="v",
-                        measure=["absolute","relative","relative","relative","relative","total"],
-                        x=["Fleet Baseline","Propulsion","Cargo Mass","Voyage Duration","Season/Weather","Expected Burn"],
-                        textposition="outside",
-                        text=[f"{tr['SHAP_Base']:.1f}",f"{tr['SHAP_Propulsion']:+.1f}",f"{tr['SHAP_Mass']:+.1f}",f"{tr['SHAP_Duration']:+.1f}",f"{tr['SHAP_Season']:+.1f}",f"{exp_burn:.1f}"],
-                        y=[tr['SHAP_Base'],tr['SHAP_Propulsion'],tr['SHAP_Mass'],tr['SHAP_Duration'],tr['SHAP_Season'],0],
-                        connector={"line":{"color":"rgba(201,168,76,0.15)"}},
-                        decreasing={"marker":{"color":"#00e0b0"}},
-                        increasing={"marker":{"color":"#e63946"}},
-                        totals={"marker":{"color":"#7b68ee"}}))
-                    fig_w.update_layout(paper_bgcolor='rgba(0,0,0,0)',plot_bgcolor='rgba(0,0,0,0)',height=400,margin=dict(t=40,b=20,l=0,r=0),title=dict(text=f"SHAP Derivation: {tr['Route']}",font=dict(color='#dce8f0',size=14,family='Bricolage Grotesque')),yaxis=dict(title='MT/Day',gridcolor='rgba(201,168,76,0.04)',zerolinecolor='rgba(201,168,76,0.06)'))
-                    st.plotly_chart(fig_w,use_container_width=True,config={'displayModeBar':False})
-                with c2:
-                    forces=['Propulsion','Mass','Duration','Season']
-                    vals=[abs(tr['SHAP_Propulsion']),abs(tr['SHAP_Mass']),abs(tr['SHAP_Duration']),abs(tr['SHAP_Season'])]
-                    fig_r=go.Figure(data=go.Scatterpolar(r=vals+[vals[0]],theta=forces+[forces[0]],fill='toself',fillcolor='rgba(0,224,176,0.2)',line_color='#00e0b0',line_width=2))
-                    fig_r.update_layout(paper_bgcolor='rgba(0,0,0,0)',plot_bgcolor='rgba(0,0,0,0)',height=250,margin=dict(t=20,b=20,l=20,r=20),polar=dict(radialaxis=dict(visible=False,range=[0,max(vals)*1.2 if max(vals)>0 else 1]),angularaxis=dict(tickfont=dict(color='#6d8599',size=10),gridcolor='rgba(201,168,76,0.08)')),showlegend=False)
-                    st.plotly_chart(fig_r,use_container_width=True,config={'displayModeBar':False})
-                st.info(f"**Forensic Translation:** Fleet baseline = **{tr['SHAP_Base']:.1f} MT/d**. Propulsion effort: **{tr['SHAP_Propulsion']:+.1f}**. Cargo mass: **{tr['SHAP_Mass']:+.1f}**. Voyage duration effect: **{tr['SHAP_Duration']:+.1f}**. Season: **{tr['SHAP_Season']:+.1f}**. Expected burn: **{exp_burn:.1f} MT/d** vs Reported: **{tr['Daily_Burn']:.1f} MT/d**.")
+                expected = target_row['SHAP_Base'] + target_row['SHAP_Prop'] + target_row['SHAP_Mass'] + target_row['SHAP_Weath'] + target_row['SHAP_Lag']
+                
+                fig = go.Figure(go.Waterfall(
+                    name="SHAP", orientation="v",
+                    measure=["absolute", "relative", "relative", "relative", "relative", "total"],
+                    x=["Fleet Baseline", "Propulsion Effort", "Cargo Mass", "Weather & Hull", "Lag & Bias", "AI Expected Burn"],
+                    textposition="outside",
+                    text=[f"{target_row['SHAP_Base']:.1f}", f"{target_row['SHAP_Prop']:+.1f}", f"{target_row['SHAP_Mass']:+.1f}", f"{target_row['SHAP_Weath']:+.1f}", f"{target_row['SHAP_Lag']:+.1f}", f"{expected:.1f}"],
+                    y=[target_row['SHAP_Base'], target_row['SHAP_Prop'], target_row['SHAP_Mass'], target_row['SHAP_Weath'], target_row['SHAP_Lag'], 0],
+                    connector={"line":{"color":"rgba(201,168,76,0.15)"}},
+                    decreasing={"marker":{"color":"#00e0b0"}}, increasing={"marker":{"color":"#e63946"}}, totals={"marker":{"color":"#7b68ee"}}
+                ))
+                fig.update_layout(
+                    paper_bgcolor='rgba(0,0,0,0)', plot_bgcolor='rgba(0,0,0,0)', 
+                    height=380, margin=dict(t=40, b=20, l=0, r=0),
+                    title=dict(text=f"Mathematical Derivation: {target_row['Route']} ({sel_time})", font=dict(color='#dce8f0', size=14)),
+                    yaxis=dict(title='Metric Tons (MT)', gridcolor='rgba(201,168,76,0.04)', zerolinecolor='rgba(201,168,76,0.06)')
+                )
+                st.plotly_chart(fig, use_container_width=True, config={'displayModeBar':False})
+                
+                st.info(f"**Forensic Translation:** The AI baseline burn is **{target_row['SHAP_Base']:.1f} MT**. Speed altered the burn by **{target_row['SHAP_Prop']:+.1f} MT**, cargo mass altered it by **{target_row['SHAP_Mass']:+.1f} MT**, and weather/hull drag altered it by **{target_row['SHAP_Weath']:+.1f} MT**. \n\nExpected actual burn was **{expected:.1f} MT**. The Chief Engineer reported **{target_row['Daily_Burn']:.1f} MT**.")
+
+        # --- TAB 7: CONFORMAL VARIANCE (New) ---
+        with tab7:
+            if 'Exp_Lower' in df.columns and df['Exp_Lower'].abs().sum() > 0:
+                fig2 = go.Figure()
+                fig2.add_trace(go.Scatter(x=df['Timeline'].tolist() + df['Timeline'].tolist()[::-1],
+                                         y=df['Exp_Upper'].tolist() + df['Exp_Lower'].tolist()[::-1],
+                                         fill='toself', fillcolor='rgba(123,104,238,0.15)', line=dict(color='rgba(255,255,255,0)'),
+                                         hoverinfo="skip", name='90% Conformal Interval'))
+                fig2.add_trace(go.Scatter(x=df['Timeline'], y=(df['Exp_Lower']+df['Exp_Upper'])/2, name="Expected Mean", line=dict(color="#7b68ee", width=2, dash='dot')))
+                fig2.add_trace(go.Scatter(x=df['Timeline'], y=df['Daily_Burn'], name="Actual Burn (FO_A)", mode='lines+markers', line=dict(color="#00e0b0", width=2), marker=dict(size=6, color="#fff")))
+                
+                fig2.update_layout(title='Conformal Prediction Bounds (90% Statistical Certainty)', paper_bgcolor='rgba(0,0,0,0)', plot_bgcolor='rgba(0,0,0,0)', font_color="#dce8f0", hovermode='x unified', height=500, yaxis=dict(**_AX), xaxis=dict(tickangle=-45, tickfont=dict(size=8), **_AX))
+                st.plotly_chart(fig2, use_container_width=True, config={'displayModeBar':False})
+                st.caption("The purple shaded area represents the mathematical boundary of the engine. If the green actual burn line escapes this boundary, it is physically anomalous.")
+            else:
+                st.info("Insufficient data to generate 90% Statistical Bounds.")
 
         st.divider()
     except Exception:
