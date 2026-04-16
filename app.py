@@ -6,7 +6,7 @@ import plotly.graph_objects as go
 from plotly.subplots import make_subplots
 
 # ═══════════════════════════════════════════════════════════════════════════════
-# TITAN CORE: BULLETPROOF PRODUCTION BUILD (Zero-Crash Architecture)
+# TITAN CORE: v24.4 ABSOLUTE ZERO-CRASH BUILD
 # ═══════════════════════════════════════════════════════════════════════════════
 try:
     from xgboost import XGBRegressor
@@ -45,6 +45,7 @@ h1,h2,h3,h4{font-family:var(--fd)!important;font-weight:800!important;color:#fff
 div[data-testid="stMetric"]{background:linear-gradient(180deg,var(--s1),var(--s2))!important;border:1px solid var(--b1)!important;border-radius:var(--r);padding:15px 12px!important;position:relative;overflow:hidden;transition:border-color .3s}
 div[data-testid="stMetric"]:hover{border-color:var(--b2)!important}
 div[data-testid="stMetric"]::after{content:'';position:absolute;top:0;left:0;right:0;height:1px;background:linear-gradient(90deg,transparent,var(--acc2),transparent);opacity:0;transition:opacity .3s}
+div[data-testid="stMetric"]:hover::after{opacity:.3}
 div[data-testid="stMetricLabel"]{font-size:0.6rem!important;color:var(--t2)!important;text-transform:uppercase!important;letter-spacing:.12em!important;font-weight:600!important;font-family:var(--fm)!important; white-space: normal; word-wrap: break-word;}
 div[data-testid="stMetricValue"]{font-size:1.3rem!important;font-weight:800!important;color:#fff!important;line-height:1.1!important;margin-top:6px!important;font-family:var(--fd)!important;letter-spacing:-.03em!important; white-space: normal; word-wrap: break-word;}
 div[data-testid="stMetricValue"]>div{color:#fff!important}
@@ -80,6 +81,7 @@ SC={"VERIFIED":"#00e0b0","GHOST BUNKER":"#e63946","LEDGER VARIANCE":"#d4a843","S
 def _rgba(h,a): return f"rgba({int(h.lstrip('#')[0:2],16)},{int(h.lstrip('#')[2:4],16)},{int(h.lstrip('#')[4:6],16)},{a})"
 OPS_KW=['RDV','OPL','STRAIT','CANAL','SECTOR','ZONE','RV PT','RV POINT','PILOT','ANCH','ROADSTEAD','TRAFFIC','SEPARATION','PSTN','KUMKALE','GELIBOLU','TURKELI','GREAT BELT']
 def _is_ops(n): return any(k in str(n).upper() for k in OPS_KW)
+
 def gauss_mf(v,c,s): return math.exp(-0.5*((v-c)/s)**2) if s>0 else (1.0 if v==c else 0.0)
 def trap_mf(v,a,b,c,d):
     if v<=a or v>=d: return 0.0
@@ -87,6 +89,7 @@ def trap_mf(v,a,b,c,d):
     if b<=v<=c: return 1.0
     if c<v<d: return (d-v)/(d-c)
     return 0.0
+
 def _sn(val):
     if pd.isna(val): return np.nan
     s = re.sub(r'[^\d.\-]', '', str(val).strip())
@@ -95,16 +98,34 @@ def _sn(val):
 def _sn0(val):
     v = _sn(val)
     return 0.0 if np.isnan(v) else v
+
 def _parse_dt(d_val,t_val):
     try:
-        ds=str(d_val).strip()
-        ts=str(t_val).strip() if pd.notna(t_val) else '00:00'
-        return pd.to_datetime(f"{ds} {ts}", errors='coerce')
+        if isinstance(d_val, pd.Timestamp): d_str = d_val.strftime('%Y-%m-%d')
+        elif pd.isna(d_val): return pd.NaT
+        else:
+            ds = str(d_val).strip()
+            ds = re.sub(r'20224','2024',ds); ds=re.sub(r'20023','2023',ds)
+            ds = re.sub(r'(\d+)\s+([A-Za-z]+)\.?\s+(\d{4})', lambda m:f"{m.group(3)}-{m.group(2)[:3]}-{m.group(1).zfill(2)}", ds)
+            p = pd.to_datetime(ds, errors='coerce', format='mixed')
+            if pd.isna(p): return pd.NaT
+            d_str = p.strftime('%Y-%m-%d')
+            
+        if isinstance(t_val, pd.Timestamp): t_str = t_val.strftime('%H:%M')
+        elif pd.isna(t_val): t_str = '00:00'
+        else:
+            tr = re.sub(r'[HhLlTtUuCc\s]', '', str(t_val).strip())
+            m = re.match(r'^(\d{1,2}):(\d{2})', tr)
+            if m: t_str = f"{m.group(1).zfill(2)}:{m.group(2)}"
+            elif re.match(r'^\d{4}$', tr): t_str = f"{tr[:2]}:{tr[2:]}"
+            elif re.match(r'^\d{3}$', tr): t_str = f"0{tr[0]}:{tr[1:]}"
+            elif re.match(r'^\d{1,2}$', tr): t_str = f"{tr.zfill(2)}:00"
+            else: t_str = '00:00'
+        return pd.to_datetime(f"{d_str} {t_str}", errors='coerce')
     except: return pd.NaT
 
 def compute_dqi(r1, r2, daily_burn, drift, chrono_bad, mgo_neg):
     s={}
-    # Safe dictionary access (.get) to prevent KeyErrors
     rob_a1 = r1.get('FO_A', np.nan); rob_a2 = r2.get('FO_A', np.nan)
     s['rob'] = 1.0 if not np.isnan(rob_a1) and not np.isnan(rob_a2) else 0.3
     tol = max(30.0, 0.03 * max(rob_a1 if not np.isnan(rob_a1) else 0, rob_a2 if not np.isnan(rob_a2) else 0))
@@ -119,7 +140,7 @@ def compute_dqi(r1, r2, daily_burn, drift, chrono_bad, mgo_neg):
     return min(100, max(0, round(math.exp(log_sum)*100, 0)))
 
 # ═══════════════════════════════════════════════════════════════════════════════
-# AI CORE: PERMISSIVE CONFORMAL PHYSICS (Only requires 2 cycles)
+# AI CORE: CONFORMAL PHYSICS (Requires only 2 trips to activate)
 # ═══════════════════════════════════════════════════════════════════════════════
 @st.cache_data(show_spinner=False)
 def calculate_stochastic_variance(trip_df):
@@ -144,6 +165,7 @@ def calculate_stochastic_variance(trip_df):
         ml['Hull_EMA'] = ml['Kin_Delta'].ewm(span=10, adjust=False).mean()
         ml['Season'] = np.sin(2*np.pi*ml['Date_Start_TS'].dt.month.fillna(6)/12.0)
         
+        # Generous mask to ensure the AI trains even on coastal hops
         mask = (ml['Daily_Burn'] > 1.0) & (ml['Days'] > 0.1) & (ml['Speed_kn'] > 2.0)
         if mask.sum() < 2: return zeros_df
 
@@ -154,10 +176,12 @@ def calculate_stochastic_variance(trip_df):
         features = ['Speed_kn', 'V3', 'Cargo_MT', 'Froude_Proxy', 'Kin_Delta', 'Hull_EMA', 'Season', 'Lag', 'Drift_MT']
         ml[features] = ml[features].fillna(0.0)
 
+        # Mean Model
         model = XGBRegressor(n_estimators=100, max_depth=3, reg_lambda=5.0, learning_rate=0.05, random_state=42)
         model.fit(ml.loc[mask, features], ml.loc[mask, 'Daily_Burn'])
         mean_preds = model.predict(ml[features])
 
+        # Variance Model
         residuals = np.abs(ml.loc[mask, 'Daily_Burn'] - model.predict(ml.loc[mask, features]))
         var_model = XGBRegressor(n_estimators=40, max_depth=2, reg_lambda=10.0, random_state=42)
         var_model.fit(ml.loc[mask, features], residuals)
@@ -181,11 +205,11 @@ def calculate_stochastic_variance(trip_df):
             'Exp_Upper': mean_preds + margin
         }, index=trip_df.index)
         
-    except Exception as e: 
+    except Exception: 
         return zeros_df
 
 # ═══════════════════════════════════════════════════════════════════════════════
-# INGEST: CRASH-PROOF FUZZY HEADERS & D-TO-D ACTUAL LEDGER
+# INGEST: THE DUAL-ROW MERGED EXCEL SHIELD
 # ═══════════════════════════════════════════════════════════════════════════════
 @st.cache_data(show_spinner=False)
 def process_file(uploaded_file):
@@ -199,39 +223,55 @@ def process_file(uploaded_file):
         
     if df_raw.empty or len(df_raw) < 4: return pd.DataFrame(), vname, {}, []
 
+    # THE FIX: Scan for merged Excel sub-headers
     header_idx = 0
     cols_found = {}
     for i in range(min(60, len(df_raw))):
         vals = [str(x).upper() for x in df_raw.iloc[i].values if pd.notna(x)]
         if any(k in v for v in vals for k in ['DATE', 'DAY']) and any(k in v for v in vals for k in ['PORT', 'LOC']):
             header_idx = i
-            for j, cell in enumerate(df_raw.iloc[i].values):
-                c = str(cell).upper().strip()
-                if 'VOY' in c: cols_found['Voy'] = j
-                elif 'PORT' in c or 'LOC' in c: cols_found['Port'] = j
-                elif 'A/D' in c or c == 'AD' or 'STATUS' in c: cols_found['AD'] = j
-                elif 'SPEED' in c: cols_found['Speed'] = j
-                elif 'CARGO' in c and 'QTY' in c: cols_found['CargoQty'] = j
-                elif 'DATE' in c or 'DAY' in c: cols_found['Date'] = j
-                elif 'TIME' in c and 'TOTAL' not in c: cols_found['Time'] = j
-                elif 'DIST' in c and 'LEG' in c: cols_found['DistLeg'] = j
-                elif 'DIST' in c and 'TOTAL' in c: cols_found['TotalDist'] = j
-                elif 'TIME' in c and 'TOTAL' in c: cols_found['TotalTime'] = j
-                elif 'BUNK' in c and 'FO' in c: cols_found['Bunk_FO'] = j
-                elif 'BUNK' in c and 'MGO' in c: cols_found['Bunk_MGO'] = j
-                elif 'BUNK' in c and 'MELO' in c: cols_found['Bunk_MELO'] = j
-                elif 'BUNK' in c and 'HSCYLO' in c: cols_found['Bunk_HSCYLO'] = j
-                elif 'BUNK' in c and 'LSCYLO' in c: cols_found['Bunk_LSCYLO'] = j
-                elif 'BUNK' in c and 'GELO' in c: cols_found['Bunk_GELO'] = j
-                elif 'FO' in c and 'L' in c: cols_found['FO_L'] = j
-                elif 'FO' in c and 'A' in c: cols_found['FO_A'] = j
-                elif 'MGO' in c and 'L' in c: cols_found['MGO_L'] = j
-                elif 'MGO' in c and 'A' in c: cols_found['MGO_A'] = j
-                elif 'MELO' in c and 'R' in c: cols_found['MELO_R'] = j
-                elif 'HSCYLO' in c and 'R' in c: cols_found['HSCYLO_R'] = j
-                elif 'LSCYLO' in c and 'R' in c: cols_found['LSCYLO_R'] = j
-                elif 'GELO' in c and 'R' in c: cols_found['GELO_R'] = j
-                elif 'CYLO' in c and 'R' in c: cols_found['CYLO_R'] = j # Fallback
+            
+            # Forward Fill horizontal merged rows
+            top_header = df_raw.iloc[i].ffill()
+            bottom_header = df_raw.iloc[i+1] if i+1 < len(df_raw) else pd.Series([np.nan]*len(df_raw.columns))
+            
+            for j in range(len(df_raw.columns)):
+                c1 = str(top_header.iloc[j]).upper().strip() if pd.notna(top_header.iloc[j]) else ""
+                c2 = str(bottom_header.iloc[j]).upper().strip() if pd.notna(bottom_header.iloc[j]) else ""
+                c_combined = f"{c1} {c2}".strip()
+                
+                if 'VOY' in c_combined: cols_found['Voy'] = j
+                elif 'PORT' in c_combined or 'LOC' in c_combined: cols_found['Port'] = j
+                elif 'A/D' in c_combined or c_combined == 'AD' or 'STATUS' in c_combined: cols_found['AD'] = j
+                elif 'SPEED' in c_combined: cols_found['Speed'] = j
+                elif 'CARGO' in c_combined or 'QTY' in c_combined or 'QUANTITY' in c_combined:
+                    if 'NAME' not in c_combined: cols_found['CargoQty'] = j
+                elif 'DATE' in c_combined or 'DAY' in c_combined: cols_found['Date'] = j
+                elif 'TIME' in c_combined and 'TOTAL' not in c_combined: cols_found['Time'] = j
+                elif 'DIST' in c_combined and 'LEG' in c_combined: cols_found['DistLeg'] = j
+                elif 'DIST' in c_combined and 'TOTAL' in c_combined: cols_found['TotalDist'] = j
+                elif 'TIME' in c_combined and 'TOTAL' in c_combined: cols_found['TotalTime'] = j
+                
+                # Deep scan for sub-headers
+                elif 'BUNKER' in c1:
+                    if 'FO' in c2 and 'MGO' not in c2: cols_found['Bunk_FO'] = j
+                    elif 'MGO' in c2: cols_found['Bunk_MGO'] = j
+                    elif 'MELO' in c2: cols_found['Bunk_MELO'] = j
+                    elif 'HSCYLO' in c2 or 'HS CYLO' in c2: cols_found['Bunk_HSCYLO'] = j
+                    elif 'LSCYLO' in c2 or 'LS CYLO' in c2: cols_found['Bunk_LSCYLO'] = j
+                    elif 'GELO' in c2: cols_found['Bunk_GELO'] = j
+                    elif 'CYLO' in c2: cols_found['Bunk_CYLO'] = j
+                
+                elif 'ROB' in c1:
+                    if 'FO A' in c2: cols_found['FO_A'] = j
+                    elif 'FO L' in c2: cols_found['FO_L'] = j
+                    elif 'MGO A' in c2: cols_found['MGO_A'] = j
+                    elif 'MGO L' in c2: cols_found['MGO_L'] = j
+                    elif 'MELO' in c2: cols_found['MELO_R'] = j
+                    elif 'HSCYLO' in c2 or 'HS CYLO' in c2: cols_found['HSCYLO_R'] = j
+                    elif 'LSCYLO' in c2 or 'LS CYLO' in c2: cols_found['LSCYLO_R'] = j
+                    elif 'GELO' in c2: cols_found['GELO_R'] = j
+                    elif 'CYLO' in c2: cols_found['CYLO_R'] = j
             break
             
     df = df_raw.iloc[header_idx+1:].copy().reset_index(drop=True)
@@ -243,8 +283,8 @@ def process_file(uploaded_file):
             else:
                 df[std_name] = df.iloc[:, exc_idx].apply(_sn).fillna(0.0)
                 
-    # ABSOLUTE GUARANTEE: Force initialize every required column to prevent KeyErrors
-    REQ_COLS = ['FO_A', 'FO_L', 'MGO_A', 'MGO_L', 'Bunk_FO', 'Bunk_MGO', 'Bunk_MELO', 'Bunk_HSCYLO', 'Bunk_LSCYLO', 'Bunk_GELO', 'MELO_R', 'HSCYLO_R', 'LSCYLO_R', 'GELO_R', 'CYLO_R', 'Speed', 'DistLeg', 'TotalDist', 'TotalTime', 'CargoQty', 'Voy', 'Port', 'AD']
+    # ABSOLUTE GUARANTEE: Force initialize every required column
+    REQ_COLS = ['FO_A','FO_L','MGO_A','MGO_L','Bunk_FO','Bunk_MGO','Bunk_MELO','Bunk_HSCYLO','Bunk_LSCYLO','Bunk_GELO','MELO_R','HSCYLO_R','LSCYLO_R','GELO_R','CYLO_R','Speed','DistLeg','TotalDist','TotalTime','CargoQty','Voy','Port','AD']
     for req in REQ_COLS:
         if req not in df.columns:
             df[req] = 0.0 if req not in ['Voy','Port','AD'] else ''
@@ -300,7 +340,7 @@ def process_file(uploaded_file):
         spd_v = window['Speed'].replace(0, np.nan).dropna()
         speed = spd_v.mean() if not spd_v.empty else (leg_nm/hours if hours>0 else 0.0)
         
-        # CRASH-PROOF MATH USING .get()
+        # CRASH-PROOF MATH (All vars routed through .get() defaults)
         bfo = window['Bunk_FO'].sum(); bmgo = window['Bunk_MGO'].sum()
         hfo_c = (r1.get('FO_A',0) - r2.get('FO_A',0)) + bfo
         mgo_raw = (r1.get('MGO_A',0) - r2.get('MGO_A',0)) + bmgo
@@ -309,15 +349,11 @@ def process_file(uploaded_file):
         drift = (r1.get('FO_A',0) - r1.get('FO_L',0)) 
         
         bmelo = window['Bunk_MELO'].sum(); bhsc = window['Bunk_HSCYLO'].sum(); blsc = window['Bunk_LSCYLO'].sum(); bgelo = window['Bunk_GELO'].sum()
-        
         melo_c = max(0, (r1.get('MELO_R',0) - r2.get('MELO_R',0)) + bmelo)
-        
-        # Safe Cyl Oil logic (handles both explicit HSCYLO/LSCYLO and combined CYLO templates)
         hsc_c = max(0, (r1.get('HSCYLO_R',0) - r2.get('HSCYLO_R',0)) + bhsc)
         lsc_c = max(0, (r1.get('LSCYLO_R',0) - r2.get('LSCYLO_R',0)) + blsc)
         cylo_fallback = max(0, (r1.get('CYLO_R',0) - r2.get('CYLO_R',0)))
         total_cylo = hsc_c + lsc_c if (hsc_c + lsc_c) > 0 else cylo_fallback
-        
         gelo_c = max(0, (r1.get('GELO_R',0) - r2.get('GELO_R',0)) + bgelo)
         
         total_fuel = hfo_c + mgo_c
@@ -433,7 +469,7 @@ def chart_voyage(df):
 # MAIN UI EXECUTION
 # ═══════════════════════════════════════════════════════════════════════════════
 st.markdown(f"""
-<div class="hero"><div class="hero-left"><img src="data:image/svg+xml;base64,{_LOGO}" class="hero-logo" alt=""/><div><div class="hero-title">POSEIDON TITAN</div><div class="hero-sub">Fleet Consumables Intelligence Engine</div></div></div><div class="hero-badge"><span>KERNEL</span>&ensp;Fuzzy Ledger + Actual FO_A<br><span>PIPELINE</span>&ensp;Kinematics & Conformal AI<br><span>BUILD</span>&ensp;v24.3 Zero-Crash Target</div></div>""",unsafe_allow_html=True)
+<div class="hero"><div class="hero-left"><img src="data:image/svg+xml;base64,{_LOGO}" class="hero-logo" alt=""/><div><div class="hero-title">POSEIDON TITAN</div><div class="hero-sub">Fleet Consumables Intelligence Engine</div></div></div><div class="hero-badge"><span>KERNEL</span>&ensp;Fuzzy Ledger + Actual FO_A<br><span>PIPELINE</span>&ensp;Kinematics & Conformal AI<br><span>BUILD</span>&ensp;v24.4 Master Deployment</div></div>""",unsafe_allow_html=True)
 
 uploaded_files=st.file_uploader('Upload vessel telemetry',accept_multiple_files=True,type=['xlsx','csv'],label_visibility='collapsed')
 
@@ -523,7 +559,7 @@ for f in uploaded_files:
             shap_ran = df['SHAP_Base'].abs().sum() > 0 if 'SHAP_Base' in df.columns else False
             
             if not shap_ran:
-                st.warning("⚠️ **AI EXPLAINABILITY OFFLINE:** The engine requires at least 2 valid sea-passages to map the physical hydrodynamics.")
+                st.warning("⚠️ **AI EXPLAINABILITY OFFLINE:** The engine requires at least 2 valid sea-passages to map the physical hydrodynamics. The data ingested successfully, but there were not enough valid ocean legs to run physics equations on.")
             else:
                 anomalies_s=df[df['Status']!='VERIFIED']
                 if anomalies_s.empty:
