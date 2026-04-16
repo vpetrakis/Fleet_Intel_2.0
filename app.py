@@ -6,7 +6,7 @@ import plotly.graph_objects as go
 from plotly.subplots import make_subplots
 
 # ═══════════════════════════════════════════════════════════════════════════════
-# TITAN CORE: v25.0 MASTERPIECE (Tri-State AD-to-AD State Machine)
+# TITAN CORE: v26.0 ZERO-TOLERANCE FORENSIC AUDITOR
 # ═══════════════════════════════════════════════════════════════════════════════
 try:
     from xgboost import XGBRegressor
@@ -20,9 +20,9 @@ warnings.filterwarnings("ignore")
 # UI CONFIGURATION & ASSETS
 st.set_page_config(page_title="POSEIDON TITAN", page_icon="⚓", layout="wide", initial_sidebar_state="collapsed")
 
-_LOGO = base64.b64encode(b'<svg viewBox="0 0 48 48" xmlns="http://www.w3.org/2000/svg"><defs><linearGradient id="pg" x1="0" y1="0" x2="1" y2="1"><stop offset="0%" stop-color="#c9a84c"/><stop offset="50%" stop-color="#00e0b0"/><stop offset="100%" stop-color="#005f73"/></linearGradient><filter id="glow"><feGaussianBlur stdDeviation="1.5" result="blur"/><feMerge><feMergeNode in="blur"/><feMergeNode in="SourceGraphic"/></feMerge></filter></defs><circle cx="24" cy="24" r="22" fill="none" stroke="url(#pg)" stroke-width="0.8" opacity=".3"><animate attributeName="r" values="22;23;22" dur="5s" repeatCount="indefinite"/></circle><circle cx="24" cy="24" r="16" fill="none" stroke="url(#pg)" stroke-width="0.5" opacity=".15" stroke-dasharray="3 5"><animateTransform attributeName="transform" type="rotate" from="0 24 24" to="360 24 24" dur="30s" repeatCount="indefinite"/></circle><g filter="url(#glow)"><path d="M24 6L24 42" stroke="url(#pg)" stroke-width="1.5" stroke-linecap="round" opacity=".6"/><path d="M12 16Q24 24 36 16" fill="none" stroke="url(#pg)" stroke-width="1.5" stroke-linecap="round"><animate attributeName="d" values="M12 16Q24 24 36 16;M12 18Q24 22 36 18;M12 16Q24 24 36 16" dur="4s" repeatCount="indefinite"/></path><path d="M10 24Q24 32 38 24" fill="none" stroke="url(#pg)" stroke-width="1.5" stroke-linecap="round"><animate attributeName="d" values="M10 24Q24 32 38 24;M10 26Q24 30 38 26;M10 24Q24 32 38 24" dur="4s" begin="0.5s" repeatCount="indefinite"/></path><path d="M12 32Q24 40 36 32" fill="none" stroke="url(#pg)" stroke-width="1.5" stroke-linecap="round"><animate attributeName="d" values="M12 32Q24 40 36 32;M12 34Q24 38 36 34;M12 32Q24 40 36 32" dur="4s" begin="1s" repeatCount="indefinite"/></path></g></svg>').decode()
+_LOGO = base64.b64encode(b'<svg viewBox="0 0 48 48" xmlns="http://www.w3.org/2000/svg"><defs><linearGradient id="pg" x1="0" y1="0" x2="1" y2="1"><stop offset="0%" stop-color="#c9a84c"/><stop offset="50%" stop-color="#00e0b0"/><stop offset="100%" stop-color="#005f73"/></linearGradient></defs><circle cx="24" cy="24" r="22" fill="none" stroke="url(#pg)" stroke-width="0.8" opacity=".3"/><path d="M24 6L24 42" stroke="url(#pg)" stroke-width="1.5" stroke-linecap="round"/><path d="M12 24Q24 32 36 24" fill="none" stroke="url(#pg)" stroke-width="1.5" stroke-linecap="round"/></svg>').decode()
 
-# ANTI-OVERLAP CSS
+# ANTI-OVERLAP CSS & GLASS BOX UI
 _CSS = '''<style>
 @import url('https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:wght@400;500;600;700;800&family=Geist+Mono:wght@400;500;600&family=Hanken+Grotesk:wght@300;400;500;600;700&display=swap');
 :root{--bg:#020609;--s1:#080d14;--s2:#0c1219;--b1:rgba(201,168,76,0.06);--b2:rgba(201,168,76,0.15);--b3:rgba(0,224,176,0.12);--acc:#00e0b0;--acc2:#c9a84c;--red:#e63946;--amber:#d4a843;--purple:#7b68ee;--t1:#dce8f0;--t2:#6d8599;--t3:#3a4d5e;--r:12px;--fd:'Bricolage Grotesque',sans-serif;--fb:'Hanken Grotesk',sans-serif;--fm:'Geist Mono',monospace}
@@ -37,67 +37,44 @@ h1,h2,h3,h4{font-family:var(--fd)!important;font-weight:800!important;color:#fff
 .hero-left{display:flex;align-items:center;gap:22px}.hero-logo{width:48px;height:48px;filter:drop-shadow(0 0 12px rgba(0,224,176,0.2))}
 .hero-title{font-family:var(--fd);font-weight:800;font-size:1.75rem;letter-spacing:-.04em;background:linear-gradient(135deg,#fff 0%,var(--acc2) 40%,var(--acc) 100%);-webkit-background-clip:text;-webkit-text-fill-color:transparent;line-height:1.1}
 .hero-sub{font-family:var(--fm);font-size:.58rem;color:var(--t3);text-transform:uppercase;letter-spacing:.2em;font-weight:500;margin-top:4px}
-.hero-badge{font-family:var(--fm);font-size:.55rem;color:var(--t3);text-align:right;line-height:2;letter-spacing:.06em}.hero-badge span{color:var(--acc);font-weight:600}
 [data-testid="stFileUploader"]{background:var(--s1)!important;border:1px dashed var(--b2)!important;border-radius:var(--r)!important;padding:24px!important;transition:all .3s}
 [data-testid="stFileUploader"]:hover{border-color:var(--acc2)!important;box-shadow:0 0 20px rgba(201,168,76,0.08)}
-[data-testid="stFileUploader"] button{background:rgba(201,168,76,.08)!important;color:var(--acc2)!important;border:1px solid var(--b2)!important;border-radius:8px!important;font-weight:600!important;margin-top:10px!important}
-div[data-testid="stMetric"]{background:linear-gradient(180deg,var(--s1),var(--s2))!important;border:1px solid var(--b1)!important;border-radius:var(--r);padding:18px 15px!important;position:relative;overflow:hidden;transition:border-color .3s}
-div[data-testid="stMetric"]:hover{border-color:var(--b2)!important}
-div[data-testid="stMetric"]::after{content:'';position:absolute;top:0;left:0;right:0;height:1px;background:linear-gradient(90deg,transparent,var(--acc2),transparent);opacity:0;transition:opacity .3s}
-div[data-testid="stMetricLabel"]{font-size:.58rem!important;color:var(--t2)!important;text-transform:uppercase!important;letter-spacing:.12em!important;font-weight:600!important;font-family:var(--fm)!important; white-space: normal; word-wrap: break-word;}
-div[data-testid="stMetricValue"]{font-size:1.45rem!important;font-weight:800!important;color:#fff!important;line-height:1.1!important;margin-top:6px!important;font-family:var(--fd)!important;letter-spacing:-.03em!important; white-space: normal; word-wrap: break-word;}
-div[data-testid="stMetricValue"]>div{color:#fff!important}
-.stTabs [data-baseweb="tab-list"]{gap:0;background:transparent;border-bottom:1px solid rgba(201,168,76,0.08); flex-wrap: wrap;}
+div[data-testid="stMetric"]{background:linear-gradient(180deg,var(--s1),var(--s2))!important;border:1px solid var(--b1)!important;border-radius:var(--r);padding:18px 15px!important;position:relative;overflow:hidden;}
+div[data-testid="stMetricLabel"]{font-size:.6rem!important;color:var(--t2)!important;text-transform:uppercase!important;letter-spacing:.12em!important;font-weight:600!important;font-family:var(--fm)!important; white-space: normal; word-wrap: break-word;}
+div[data-testid="stMetricValue"]{font-size:1.4rem!important;font-weight:800!important;color:#fff!important;line-height:1.1!important;margin-top:6px!important;font-family:var(--fd)!important; white-space: normal; word-wrap: break-word;}
 .stTabs [data-baseweb="tab"]{background:transparent;border:none;border-bottom:2px solid transparent;border-radius:0;padding:12px 18px;color:var(--t3);font-weight:600;font-size:.65rem;text-transform:uppercase;letter-spacing:.12em;font-family:var(--fm);transition:all .3s}
-.stTabs [data-baseweb="tab"]:hover{color:var(--t1)}
-.stTabs [data-baseweb="tab"][aria-selected="true"]{color:var(--acc)!important;border-bottom-color:var(--acc)!important}
-.stTabs [data-baseweb="tab-highlight"]{display:none}
+.stTabs [aria-selected="true"]{color:var(--acc)!important;border-bottom-color:var(--acc)!important}
 .stDataFrame{border-radius:var(--r)!important;overflow:hidden!important;border:1px solid var(--b1)!important}
-.stDownloadButton>button{background:rgba(201,168,76,.06)!important;color:var(--acc2)!important;border:1px solid var(--b2)!important;border-radius:10px!important;font-weight:600!important;padding:10px 24px!important;transition:all .3s!important}
-.stDownloadButton>button:hover{background:rgba(201,168,76,.12)!important;box-shadow:0 4px 30px rgba(201,168,76,0.08)!important;transform:translateY(-1px)!important}
-hr{border:none!important;height:1px!important;background:linear-gradient(90deg,transparent,rgba(201,168,76,0.04),rgba(201,168,76,.08),rgba(201,168,76,0.04),transparent)!important;margin:32px 0!important}
-.vcard{background:linear-gradient(165deg,var(--s1),rgba(0,95,115,0.04));border:1px solid var(--b1);border-radius:16px;padding:26px 32px;margin-bottom:20px;position:relative;overflow:hidden}
-.vcard::before{content:'';position:absolute;top:0;left:5%;right:5%;height:1px;background:linear-gradient(90deg,transparent,var(--acc2),transparent);opacity:.2}
-.acard{background:var(--s1);border-radius:10px;padding:16px 20px;margin-bottom:8px;transition:transform .2s,box-shadow .2s}
-.acard:hover{transform:translateX(3px);box-shadow:-3px 0 20px rgba(0,0,0,0.3)}
-.pill{display:inline-block;padding:4px 12px;border-radius:20px;font-size:.58rem;font-weight:700;letter-spacing:.08em;text-transform:uppercase;font-family:var(--fm)}
+.acard{background:var(--s1);border-radius:10px;padding:16px 20px;margin-bottom:8px;border-left:3px solid var(--red); transition:transform .2s}
+.acard:hover{transform:translateX(3px)}
+.pill{display:inline-block;padding:4px 12px;border-radius:20px;font-size:.55rem;font-weight:700;letter-spacing:.08em;text-transform:uppercase;font-family:var(--fm)}
 .p-ok{background:rgba(0,224,176,.06);color:var(--acc);border:1px solid rgba(0,224,176,.15)}
 .p-w{background:rgba(212,168,67,.06);color:var(--amber);border:1px solid rgba(212,168,67,.15)}
 .p-c{background:rgba(230,57,70,.06);color:var(--red);border:1px solid rgba(230,57,70,.15)}
 ::-webkit-scrollbar{width:4px;height:4px}::-webkit-scrollbar-track{background:var(--bg)}::-webkit-scrollbar-thumb{background:var(--t3);border-radius:2px}
-div[data-baseweb="select"] > div {background: var(--s1); border-color: var(--b1); color: #fff;}
 </style>'''
 st.markdown(_CSS, unsafe_allow_html=True)
 
 # ═══════════════════════════════════════════════════════════════════════════════
-# ICONS & UTILS
+# STRICT PARSING UTILS (No Hallucinated Data)
 # ═══════════════════════════════════════════════════════════════════════════════
 def _u(s): return f"data:image/svg+xml;base64,{base64.b64encode(s.encode()).decode()}"
 ICONS={"VERIFIED":_u('<svg viewBox="0 0 28 28" xmlns="http://www.w3.org/2000/svg"><defs><filter id="g"><feGaussianBlur stdDeviation="1" result="b"/><feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge></filter></defs><circle cx="14" cy="14" r="12" fill="none" stroke="#00e0b0" stroke-width="1" opacity=".2"><animate attributeName="r" values="12;13;12" dur="3s" repeatCount="indefinite"/></circle><circle cx="14" cy="14" r="7.5" fill="#061a14" stroke="#00e0b0" stroke-width="1.2" filter="url(#g)"/><polyline points="10,14.5 12.8,17 18,10.5" fill="none" stroke="#00e0b0" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>'),"GHOST BUNKER":_u('<svg viewBox="0 0 28 28" xmlns="http://www.w3.org/2000/svg"><defs><filter id="g2"><feGaussianBlur stdDeviation="1" result="b"/><feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge></filter></defs><circle cx="14" cy="14" r="12" fill="none" stroke="#e63946" stroke-width="1" stroke-dasharray="4 3"><animateTransform attributeName="transform" type="rotate" from="0 14 14" to="360 14 14" dur="8s" repeatCount="indefinite"/></circle><circle cx="14" cy="14" r="7.5" fill="#1a0508" stroke="#e63946" stroke-width="1.2" filter="url(#g2)"/><g stroke="#e63946" stroke-width="2" stroke-linecap="round"><line x1="11" y1="11" x2="17" y2="17"><animate attributeName="opacity" values="1;.3;1" dur="1.2s" repeatCount="indefinite"/></line><line x1="17" y1="11" x2="11" y2="17"><animate attributeName="opacity" values="1;.3;1" dur="1.2s" repeatCount="indefinite"/></line></g></svg>'),"STAT OUTLIER":_u('<svg viewBox="0 0 28 28" xmlns="http://www.w3.org/2000/svg"><defs><filter id="g4"><feGaussianBlur stdDeviation="1" result="b"/><feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge></filter></defs><rect x="4" y="4" width="20" height="20" rx="5" fill="none" stroke="#7b68ee" stroke-width="1.2" filter="url(#g4)"><animate attributeName="stroke-dasharray" values="0,80;80,0;0,80" dur="4s" repeatCount="indefinite"/></rect><circle cx="14" cy="14" r="4.5" fill="#0e0a1e" stroke="#7b68ee" stroke-width="1.2"/><circle cx="14" cy="14" r="1.8" fill="#7b68ee"><animate attributeName="r" values="1.8;2.8;1.8" dur="2s" repeatCount="indefinite"/></circle></svg>')}
 SC={"VERIFIED":"#00e0b0","GHOST BUNKER":"#e63946","STAT OUTLIER":"#7b68ee"}
 
-def _rgba(h,a): return f"rgba({int(h.lstrip('#')[0:2],16)},{int(h.lstrip('#')[2:4],16)},{int(h.lstrip('#')[4:6],16)},{a})"
-OPS_KW=['RDV','OPL','STRAIT','CANAL','SECTOR','ZONE','RV PT','RV POINT','PILOT','ANCH','ROADSTEAD','TRAFFIC','SEPARATION','PSTN','KUMKALE','GELIBOLU','TURKELI','GREAT BELT']
-def _is_ops(n): return any(k in str(n).upper() for k in OPS_KW)
-def gauss_mf(v,c,s): return math.exp(-0.5*((v-c)/s)**2) if s>0 else (1.0 if v==c else 0.0)
-def trap_mf(v,a,b,c,d):
-    if v<=a or v>=d: return 0.0
-    if a<v<b: return (v-a)/(b-a)
-    if b<=v<=c: return 1.0
-    if c<v<d: return (d-v)/(d-c)
-    return 0.0
-
 def _sn(val):
+    # Strict Null: Returns np.nan if blank. Never returns 0.0 for missing data.
     if pd.isna(val): return np.nan
     s = re.sub(r'[^\d.\-]', '', str(val).strip())
     try: return float(s) if s and s not in ('.','-','-.') else np.nan
     except: return np.nan
 
 def _sn0(val):
+    # Zero Null: Only used for quantities like Cargo or Bunkers where blank = 0
     v = _sn(val)
     return 0.0 if np.isnan(v) else v
 
-def _parse_dt(d_val,t_val):
+def _parse_dt(d_val, t_val):
     try:
         if isinstance(d_val, pd.Timestamp): d_str = d_val.strftime('%Y-%m-%d')
         elif pd.isna(d_val): return pd.NaT
@@ -122,107 +99,85 @@ def _parse_dt(d_val,t_val):
         return pd.to_datetime(f"{d_str} {t_str}", errors='coerce')
     except: return pd.NaT
 
-def compute_dqi(r1, r2, daily_burn, drift, chrono_bad, mgo_neg):
-    s={}
-    rob_a1 = r1.get('FO_A', np.nan); rob_a2 = r2.get('FO_A', np.nan)
-    s['rob'] = 1.0 if not np.isnan(rob_a1) and not np.isnan(rob_a2) else 0.3
-    tol = max(30.0, 0.03 * max(rob_a1 if not np.isnan(rob_a1) else 0, rob_a2 if not np.isnan(rob_a2) else 0))
-    s['drift'] = gauss_mf(drift, 0.0, tol)
-    if daily_burn > 0: s['burn'] = gauss_mf(daily_burn, 30.0, 25.0)
-    elif daily_burn == 0: s['burn'] = 0.5
-    else: s['burn'] = 0.1
-    s['chrono'] = 0.3 if chrono_bad else 1.0
-    s['mgo'] = 0.3 if mgo_neg else 1.0
-    w = {'rob':0.30,'drift':0.30,'burn':0.20,'chrono':0.10,'mgo':0.10}
-    log_sum = sum(w[k]*math.log(max(v,0.001)) for k,v in s.items())
-    return min(100, max(0, round(math.exp(log_sum)*100, 0)))
-
 # ═══════════════════════════════════════════════════════════════════════════════
-# AI ENGINE: ISOLATED THERMODYNAMICS (Trains strictly on Sea Legs)
+# AI ENGINE: ISOLATED KINEMATICS (Sea Legs Only)
 # ═══════════════════════════════════════════════════════════════════════════════
 @st.cache_data(show_spinner=False)
-def calculate_stochastic_variance(trip_df):
+def compute_ai_physics(trip_df):
     res_df = pd.DataFrame({
-        'Stoch_Var':[0.0]*len(trip_df), 'SHAP_Base':[0.0]*len(trip_df), 'SHAP_Prop':[0.0]*len(trip_df), 
-        'SHAP_Mass':[0.0]*len(trip_df), 'SHAP_Weath':[0.0]*len(trip_df), 'SHAP_Lag':[0.0]*len(trip_df),
-        'Exp_Lower':[0.0]*len(trip_df), 'Exp_Upper':[0.0]*len(trip_df)
+        'AI_Exp':[np.nan]*len(trip_df), 'Stoch_Var':[np.nan]*len(trip_df), 
+        'SHAP_Base':[np.nan]*len(trip_df), 'SHAP_Prop':[np.nan]*len(trip_df), 
+        'SHAP_Mass':[np.nan]*len(trip_df), 'SHAP_Weath':[np.nan]*len(trip_df), 
+        'Exp_Lower':[np.nan]*len(trip_df), 'Exp_Upper':[np.nan]*len(trip_df)
     }, index=trip_df.index)
     
+    if not HAS_ML: return res_df
+    
     try:
-        if not HAS_ML: return res_df
+        # STRICT ISOLATION: The AI physically cannot see Port Legs or Quarantined Legs
+        sea_mask = (trip_df['Phase'] == 'SEA') & (trip_df['Status'] == 'VERIFIED') & (trip_df['Speed_kn'] > 2.0)
+        if sea_mask.sum() < 2: return res_df
         
-        ml = trip_df.copy()
+        ml = trip_df.loc[sea_mask].copy()
         
-        # Physics Engine setup
+        # PURE KINEMATICS
         ml['SOG'] = ml['Dist_NM'] / np.maximum(ml['Days']*24, 0.1)
         ml['Kin_Delta'] = (ml['Speed_kn'] - ml['SOG']).clip(-3.0, 3.0)
         ml['V3'] = ml['Speed_kn']**3
         ml['Cargo_MT'] = np.where(ml['Condition']=='LADEN', ml['CargoQty'], 0.0)
-        ml['Froude_Proxy'] = (ml['Speed_kn']**2) * (ml['Cargo_MT'] / 10000.0)
+        ml['Froude_Proxy'] = (ml['Speed_kn']**3) * (ml['Cargo_MT'] / 10000.0) # V^3 * Mass interaction
         
         ml = ml.sort_values('Date_Start_TS')
         ml['Hull_EMA'] = ml['Kin_Delta'].ewm(span=10, adjust=False).mean()
         ml['Season'] = np.sin(2*np.pi*ml['Date_Start_TS'].dt.month.fillna(6)/12.0)
         
-        # TRI-STATE ISOLATION: AI exclusively trains on Sea Legs
-        sea_mask = (ml['Phase'] == 'SEA') & (ml['Daily_Burn'] > 1.0) & (ml['Days'] > 0.1) & (ml['Speed_kn'] > 2.0)
-        if sea_mask.sum() < 2: return res_df
-
-        t_mod = XGBRegressor(n_estimators=20, max_depth=2, random_state=42)
-        t_mod.fit(ml.loc[sea_mask, ['Speed_kn', 'Cargo_MT', 'Kin_Delta']], ml.loc[sea_mask, 'Daily_Burn'])
-        ml['Lag'] = (ml['Daily_Burn'] - t_mod.predict(ml[['Speed_kn', 'Cargo_MT', 'Kin_Delta']])).shift(1).fillna(0).clip(-12, 12)
-
-        features = ['Speed_kn', 'V3', 'Cargo_MT', 'Froude_Proxy', 'Kin_Delta', 'Hull_EMA', 'Season', 'Lag']
+        features = ['Speed_kn', 'V3', 'Cargo_MT', 'Froude_Proxy', 'Kin_Delta', 'Hull_EMA', 'Season']
         ml[features] = ml[features].fillna(0.0)
 
-        # Mean Conformal Model
+        # MEAN MODEL
         model = XGBRegressor(n_estimators=100, max_depth=3, reg_lambda=5.0, learning_rate=0.05, random_state=42)
-        model.fit(ml.loc[sea_mask, features], ml.loc[sea_mask, 'Daily_Burn'])
+        model.fit(ml[features], ml['Phys_Burn'])
         
-        # Variance Conformal Model
-        residuals = np.abs(ml.loc[sea_mask, 'Daily_Burn'] - model.predict(ml.loc[sea_mask, features]))
+        # VARIANCE MODEL
+        residuals = np.abs(ml['Phys_Burn'] - model.predict(ml[features]))
         var_model = XGBRegressor(n_estimators=40, max_depth=2, reg_lambda=10.0, random_state=42)
-        var_model.fit(ml.loc[sea_mask, features], residuals)
+        var_model.fit(ml[features], residuals)
         
-        sea_preds = model.predict(ml.loc[sea_mask, features])
-        sea_vars = var_model.predict(ml.loc[sea_mask, features])
-        sea_margins = np.maximum(sea_vars * 1.645, 0.5) 
+        preds = model.predict(ml[features])
+        margins = np.maximum(var_model.predict(ml[features]) * 1.645, 0.5) 
         
         explainer = shap.TreeExplainer(model)
-        sv = explainer.shap_values(ml.loc[sea_mask, features])
+        sv = explainer.shap_values(ml[features])
         base = explainer.expected_value
         if isinstance(base, np.ndarray): base = base[0]
 
-        # Re-inject perfectly isolated physics back into the dataframe
-        res_df.loc[sea_mask, 'Stoch_Var'] = sea_margins.round(1)
+        # Inject back only into verified Sea Legs
+        res_df.loc[sea_mask, 'AI_Exp'] = preds.round(1)
+        res_df.loc[sea_mask, 'Stoch_Var'] = margins.round(1)
         res_df.loc[sea_mask, 'SHAP_Base'] = base
-        res_df.loc[sea_mask, 'SHAP_Prop'] = sv[:,0] + sv[:,1] + sv[:,3]
+        res_df.loc[sea_mask, 'SHAP_Prop'] = sv[:,0] + sv[:,1] + sv[:,3] # Speed + V3 + Froude
         res_df.loc[sea_mask, 'SHAP_Mass'] = sv[:,2]
-        res_df.loc[sea_mask, 'SHAP_Weath'] = sv[:,4] + sv[:,5] + sv[:,6]
-        res_df.loc[sea_mask, 'SHAP_Lag'] = sv[:,7]
-        res_df.loc[sea_mask, 'Exp_Lower'] = sea_preds - sea_margins
-        res_df.loc[sea_mask, 'Exp_Upper'] = sea_preds + sea_margins
+        res_df.loc[sea_mask, 'SHAP_Weath'] = sv[:,4] + sv[:,5] + sv[:,6] # Kin_Delta + Hull_EMA + Season
+        res_df.loc[sea_mask, 'Exp_Lower'] = preds - margins
+        res_df.loc[sea_mask, 'Exp_Upper'] = preds + margins
         
         return res_df
-    except Exception: 
-        return res_df
+    except Exception: return res_df
 
 # ═══════════════════════════════════════════════════════════════════════════════
-# INGEST: SEMANTIC PARSER & AD-TO-AD EVENT MACHINE
+# INGESTION: THE FORENSIC AD-TO-AD STATE MACHINE
 # ═══════════════════════════════════════════════════════════════════════════════
 @st.cache_data(show_spinner=False)
 def master_ingest(uploaded_file):
     vn_raw = re.sub(r'\.[^.]+$', '', uploaded_file.name).strip()
     vname = re.sub(r'[_\-]+', ' ', vn_raw).upper()
     
-    if uploaded_file.name.lower().endswith('.xlsx'):
-        df_raw = pd.read_excel(uploaded_file, header=None, engine='openpyxl')
-    else:
-        df_raw = pd.read_csv(io.StringIO(uploaded_file.getvalue().decode('latin-1', errors='replace')), header=None, on_bad_lines='skip')
+    if uploaded_file.name.lower().endswith('.xlsx'): df_raw = pd.read_excel(uploaded_file, header=None, engine='openpyxl')
+    else: df_raw = pd.read_csv(io.StringIO(uploaded_file.getvalue().decode('latin-1', errors='replace')), header=None, on_bad_lines='skip')
         
     if df_raw.empty or len(df_raw) < 4: return pd.DataFrame(), vname, {}
 
-    # SEMANTIC MERGED CELL PARSER
+    # SEMANTIC HEADER PARSER (Explicit Mapping)
     header_idx = 0
     cols_found = {}
     for i in range(min(60, len(df_raw))):
@@ -247,40 +202,27 @@ def master_ingest(uploaded_file):
                 elif 'TIME' in c_combined and 'TOTAL' not in c_combined: cols_found['Time'] = j
                 elif 'DIST' in c_combined and 'LEG' in c_combined: cols_found['DistLeg'] = j
                 elif 'DIST' in c_combined and 'TOTAL' in c_combined: cols_found['TotalDist'] = j
-                elif 'TIME' in c_combined and 'TOTAL' in c_combined: cols_found['TotalTime'] = j
                 
-                elif 'BUNKER' in c1:
+                elif 'BUNKER' in c1 or 'RECEIV' in c1:
                     if 'FO' in c2 and 'MGO' not in c2: cols_found['Bunk_FO'] = j
                     elif 'MGO' in c2: cols_found['Bunk_MGO'] = j
-                    elif 'MELO' in c2: cols_found['Bunk_MELO'] = j
-                    elif 'HSCYLO' in c2 or 'HS CYLO' in c2: cols_found['Bunk_HSCYLO'] = j
-                    elif 'LSCYLO' in c2 or 'LS CYLO' in c2: cols_found['Bunk_LSCYLO'] = j
-                    elif 'GELO' in c2: cols_found['Bunk_GELO'] = j
-                    elif 'CYLO' in c2: cols_found['Bunk_CYLO'] = j
-                
                 elif 'ROB' in c1:
                     if 'FO A' in c2: cols_found['FO_A'] = j
                     elif 'FO L' in c2: cols_found['FO_L'] = j
-                    elif 'MGO A' in c2: cols_found['MGO_A'] = j
-                    elif 'MGO L' in c2: cols_found['MGO_L'] = j
-                    elif 'MELO' in c2: cols_found['MELO_R'] = j
-                    elif 'HSCYLO' in c2 or 'HS CYLO' in c2: cols_found['HSCYLO_R'] = j
-                    elif 'LSCYLO' in c2 or 'LS CYLO' in c2: cols_found['LSCYLO_R'] = j
-                    elif 'GELO' in c2: cols_found['GELO_R'] = j
-                    elif 'CYLO' in c2: cols_found['CYLO_R'] = j
             break
             
     df = df_raw.iloc[header_idx+1:].copy().reset_index(drop=True)
+    
+    # Safe Extraction
     for std_name, exc_idx in cols_found.items():
         if exc_idx < len(df.columns):
             if std_name in ['Voy', 'Port', 'AD', 'Date', 'Time']: df[std_name] = df.iloc[:, exc_idx]
-            else: df[std_name] = df.iloc[:, exc_idx].apply(_sn).fillna(0.0)
-                
-    # Crash-Proof Dictionary Initialization
-    REQ_COLS = ['FO_A','FO_L','MGO_A','MGO_L','Bunk_FO','Bunk_MGO','Bunk_MELO','Bunk_HSCYLO','Bunk_LSCYLO','Bunk_GELO','MELO_R','HSCYLO_R','LSCYLO_R','GELO_R','CYLO_R','Bunk_CYLO','Speed','DistLeg','TotalDist','TotalTime','CargoQty','Voy','Port','AD']
+            else: df[std_name] = df.iloc[:, exc_idx] # Keep raw for strict parsing
+
+    # Guarantee Dictionary Structure
+    REQ_COLS = ['FO_A','FO_L','Bunk_FO','Bunk_MGO','Speed','DistLeg','TotalDist','CargoQty','Voy','Port','AD']
     for req in REQ_COLS:
-        if req not in df.columns:
-            df[req] = 0.0 if req not in ['Voy','Port','AD'] else ''
+        if req not in df.columns: df[req] = np.nan if req in ['FO_A', 'FO_L'] else (0.0 if req not in ['Voy','Port','AD'] else '')
 
     df['Datetime'] = df.apply(lambda r: _parse_dt(r.get('Date'), r.get('Time')), axis=1)
     df = df.dropna(subset=['Datetime']).sort_values('Datetime').reset_index(drop=True)
@@ -289,7 +231,6 @@ def master_ingest(uploaded_file):
         v = str(v).strip().upper().replace(' ','')
         if v in ['D', 'DEP', 'SBE', 'FAOP']: return 'D'
         if v.startswith('A') and 'D' not in v: return 'A'
-        if 'D' in v and 'A' not in v: return 'D'
         return v
     df['AD'] = df['AD'].apply(_cad)
     
@@ -297,145 +238,124 @@ def master_ingest(uploaded_file):
     if len(ad_events) < 2: return pd.DataFrame(), vname, {}
     
     trips = []
+    
+    # CHAIN OF CUSTODY VALIDATION
     for i in range(len(ad_events)-1):
         r1 = ad_events.iloc[i]
         r2 = ad_events.iloc[i+1]
         idx1, idx2 = r1.name, r2.name
         
-        # State Logic
+        status = 'VERIFIED'
+        flags = []
+        phys_burn, log_burn, drift, days = np.nan, np.nan, np.nan, 0.0
+        
+        # 1. State Verification
         if r1['AD'] == 'D' and r2['AD'] == 'A': phase = 'SEA'
         elif r1['AD'] == 'A' and r2['AD'] == 'D': phase = 'PORT'
-        else: phase = 'SHIFT'
+        else: 
+            phase = 'QUARANTINE_SEQ'
+            status = 'CHAIN BREAK'
+            flags.append(f"Invalid sequence: {r1['AD']} → {r2['AD']}")
             
-        days = (r2['Datetime'] - r1['Datetime']).total_seconds() / 86400.0
-        if days < 0.05: continue
+        # 2. Time Verification
+        if status == 'VERIFIED':
+            days = (r2['Datetime'] - r1['Datetime']).total_seconds() / 86400.0
+            if days <= 0:
+                status = 'QUARANTINE_TIME'
+                flags.append("Negative/Zero Time Delta")
+                
+        # 3. Physical ROB Verification (No Guessing allowed)
+        if status == 'VERIFIED':
+            start_rob = _sn(r1.get('FO_A'))
+            end_rob = _sn(r2.get('FO_A'))
+            if pd.isna(start_rob) or pd.isna(end_rob):
+                status = 'QUARANTINE_ROB'
+                flags.append("Missing Physical Tank Sounding (FO_A)")
         
+        # Window Operations
         window = df.loc[idx1+1:idx2]
+        if phase == 'PORT': bfo = _sn0(df.loc[idx1:idx2, 'Bunk_FO'].sum())
+        else: bfo = _sn0(window['Bunk_FO'].sum())
         
-        # Bunkers log either inside the window or precisely on the day of departure
-        if phase == 'PORT':
-            bfo = df.loc[idx1:idx2, 'Bunk_FO'].sum()
-            bmgo = df.loc[idx1:idx2, 'Bunk_MGO'].sum()
-            bmelo = df.loc[idx1:idx2, 'Bunk_MELO'].sum()
-            bcylo = df.loc[idx1:idx2, 'Bunk_HSCYLO'].sum() + df.loc[idx1:idx2, 'Bunk_LSCYLO'].sum() + df.loc[idx1:idx2, 'Bunk_CYLO'].sum()
-            bgelo = df.loc[idx1:idx2, 'Bunk_GELO'].sum()
-        else:
-            bfo = window['Bunk_FO'].sum()
-            bmgo = window['Bunk_MGO'].sum()
-            bmelo = window['Bunk_MELO'].sum()
-            bcylo = window['Bunk_HSCYLO'].sum() + window['Bunk_LSCYLO'].sum() + window['Bunk_CYLO'].sum()
-            bgelo = window['Bunk_GELO'].sum()
-            
-        # Unified Mass Balance
-        hfo_c = (r1.get('FO_A', 0) - r2.get('FO_A', 0)) + bfo
-        mgo_raw = (r1.get('MGO_A', 0) - r2.get('MGO_A', 0)) + bmgo
-        total_fuel = hfo_c + max(0.0, mgo_raw)
-        daily_burn = total_fuel / days if days > 0 else 0.0
-        
-        dist = window['DistLeg'].sum() if 'DistLeg' in window.columns else 0.0
-        if dist <= 0 and phase == 'SEA': dist = max(0, r2.get('TotalDist',0) - r1.get('TotalDist',0))
+        dist = _sn0(window['DistLeg'].sum()) if 'DistLeg' in window.columns else 0.0
+        if dist <= 0 and phase == 'SEA': dist = max(0, _sn0(r2.get('TotalDist')) - _sn0(r1.get('TotalDist')))
         
         speed = window['Speed'].replace(0, np.nan).mean() if not window['Speed'].empty else np.nan
         if pd.isna(speed): speed = dist / (days * 24.0) if days > 0 else 0.0
+        
+        # 4. Deterministic Arithmetic (Glass Box)
+        if status == 'VERIFIED':
+            phys_burn = (start_rob - end_rob) + bfo
             
-        melo_c = max(0, (r1.get('MELO_R',0) - r2.get('MELO_R',0)) + bmelo)
-        cylo_r1 = r1.get('HSCYLO_R',0) + r1.get('LSCYLO_R',0) + r1.get('CYLO_R',0)
-        cylo_r2 = r2.get('HSCYLO_R',0) + r2.get('LSCYLO_R',0) + r2.get('CYLO_R',0)
-        cylo_c = max(0, (cylo_r1 - cylo_r2) + bcylo)
-        gelo_c = max(0, (r1.get('GELO_R',0) - r2.get('GELO_R',0)) + bgelo)
-        
+            # Logged verification
+            log_start = _sn(r1.get('FO_L')) if not pd.isna(_sn(r1.get('FO_L'))) else start_rob
+            log_end = _sn(r2.get('FO_L')) if not pd.isna(_sn(r2.get('FO_L'))) else end_rob
+            log_burn = (log_start - log_end) + bfo
+            
+            drift = phys_burn - log_burn
+            
+            if phys_burn < -2.0:
+                status = 'GHOST BUNKER'
+                flags.append("Mass Balance Imbalance: End ROB > Start + Bunkers")
+                
         route = f"{str(r1.get('Port',''))[:15]} → {str(r2.get('Port',''))[:15]}" if phase == 'SEA' else f"Port Idle: {str(r1.get('Port',''))[:15]}"
-        
-        # Missing Bunker Isolation
-        status = 'VERIFIED'
-        flags = []
-        if phase == 'PORT' and total_fuel < -5.0:
-            status = 'GHOST BUNKER'
-            flags.append(f"UNLOGGED BUNKER ~{abs(total_fuel):.0f}MT")
-        elif phase == 'SEA' and total_fuel < -2.0:
-            status = 'GHOST BUNKER'
-            flags.append("NEGATIVE SEA BURN ANOMALY")
-        
         qty = _sn0(r1.get('CargoQty', 0))
         
         trips.append({
-            'Indicator': ICONS.get(status, ICONS['VERIFIED']),
+            'Indicator': ICONS.get(status, ICONS['VERIFIED']) if 'QUARANTINE' not in status else '⛔',
             'Timeline': f"{r1['Datetime'].strftime('%d %b %y')} → {r2['Datetime'].strftime('%d %b %y')}",
             'Date_Start_TS': r1['Datetime'],
             'Phase': phase,
             'Condition': 'LADEN' if qty > 100 else 'BALLAST',
+            'CargoQty': qty,
             'Route': route,
             'Days': round(days, 2),
             'Dist_NM': round(dist, 0),
             'Speed_kn': round(speed, 1),
-            'Fuel_MT': round(total_fuel, 1),
-            'Daily_Burn': round(daily_burn, 1),
-            'MELO_L': round(melo_c, 0),
-            'CYLO_L': round(cylo_c, 0),
+            'FO_A_Start': start_rob if status == 'VERIFIED' else np.nan,
+            'Bunk_FO': bfo,
+            'FO_A_End': end_rob if status == 'VERIFIED' else np.nan,
+            'Phys_Burn': round(phys_burn, 1),
+            'Log_Burn': round(log_burn, 1),
+            'Drift_MT': round(drift, 1),
+            'Daily_Burn': round(phys_burn/days, 1) if days > 0 and not pd.isna(phys_burn) else np.nan,
             'Status': status,
-            'Flags': ','.join(flags) if flags else ''
+            'Flags': ', '.join(flags) if flags else ''
         })
 
     trip_df = pd.DataFrame(trips)
     
-    # Isolate Statistical Outliers strictly to Sea Legs
-    if len(trip_df) >= 4:
-        for cond in ['LADEN', 'BALLAST']:
-            ver = trip_df[(trip_df['Status'] == 'VERIFIED') & (trip_df['Phase'] == 'SEA') & (trip_df['Daily_Burn'] > 0) & (trip_df['Condition'] == cond)]
-            if len(ver) >= 4:
-                q1, q3 = ver['Daily_Burn'].quantile(0.25), ver['Daily_Burn'].quantile(0.75); iqr = q3 - q1
-                if iqr > 0:
-                    lo, hi = q1 - 2.0*iqr, q3 + 2.0*iqr
-                    mask = (trip_df['Status'] == 'VERIFIED') & (trip_df['Phase'] == 'SEA') & (trip_df['Condition'] == cond) & ((trip_df['Daily_Burn'] < lo) | (trip_df['Daily_Burn'] > hi))
-                    trip_df.loc[mask, 'Status'] = 'STAT OUTLIER'; trip_df.loc[mask, 'Indicator'] = ICONS['STAT OUTLIER']
-
-    # Merge AI bounds
+    # Inject isolated AI bounds
     if not trip_df.empty:
-        ai_df = calculate_stochastic_variance(trip_df)
+        ai_df = compute_ai_physics(trip_df)
         for col in ai_df.columns: trip_df[col] = ai_df[col]
 
     summary = {}
     if not trip_df.empty:
-        sea_burn = trip_df[(trip_df['Phase'] == 'SEA') & (trip_df['Daily_Burn'] > 0)]['Daily_Burn']
+        verified_sea = trip_df[(trip_df['Phase'] == 'SEA') & (trip_df['Status'] == 'VERIFIED') & (trip_df['Phys_Burn'] > 0)]['Phys_Burn']
+        verified_sea_days = trip_df[(trip_df['Phase'] == 'SEA') & (trip_df['Status'] == 'VERIFIED') & (trip_df['Phys_Burn'] > 0)]['Days']
+        avg_sea = verified_sea.sum() / verified_sea_days.sum() if verified_sea_days.sum() > 0 else 0.0
+        
+        quarantined = len(trip_df[trip_df['Status'].str.contains('QUARANTINE')])
+        
         summary = {
-            'integrity': round((trip_df['Status'] == 'VERIFIED').sum() / len(trip_df) * 100, 1),
-            'total_fuel': round(trip_df['Fuel_MT'].sum(), 1),
-            'avg_sea_burn': round(sea_burn.mean(), 1) if not sea_burn.empty else 0.0,
+            'integrity': round((len(trip_df) - quarantined) / len(trip_df) * 100, 1),
+            'total_fuel': round(trip_df['Phys_Burn'].sum(skipna=True), 1),
+            'avg_sea_burn': round(avg_sea, 1),
             'total_nm': round(trip_df['Dist_NM'].sum(), 0),
-            'total_melo': round(trip_df['MELO_L'].sum(), 0),
-            'total_cylo': round(trip_df['CYLO_L'].sum(), 0),
             'total_days': round(trip_df['Days'].sum(), 1),
             'cycles': len(trip_df),
-            'anomalies': len(trip_df) - (trip_df['Status'] == 'VERIFIED').sum()
+            'quarantined': quarantined,
+            'anomalies': len(trip_df[trip_df['Status'] == 'GHOST BUNKER'])
         }
         
     return trip_df, vname, summary
 
 # ═══════════════════════════════════════════════════════════════════════════════
-# CHARTS (Responsive & Isolated)
-# ═══════════════════════════════════════════════════════════════════════════════
-_BL=dict(paper_bgcolor='rgba(0,0,0,0)',plot_bgcolor='rgba(0,0,0,0)',hovermode='x unified',font=dict(family='Hanken Grotesk',color='#dce8f0'),margin=dict(l=0,r=0,t=55,b=20))
-_AX=dict(gridcolor='rgba(201,168,76,0.04)',zerolinecolor='rgba(201,168,76,0.06)',tickfont=dict(size=10))
-
-def chart_fuel(df):
-    sea = df[df['Phase'] == 'SEA']
-    port = df[df['Phase'] == 'PORT']
-    fig = make_subplots(rows=2, cols=1, shared_xaxes=True, row_heights=[0.65, 0.35], vertical_spacing=0.08)
-    
-    if not sea.empty: fig.add_trace(go.Bar(x=sea['Timeline'], y=sea['Fuel_MT'], name='Sea Fuel', marker_color='rgba(0,224,176,0.15)', marker_line_color='#00e0b0', marker_line_width=1.5), row=1, col=1)
-    if not port.empty: fig.add_trace(go.Bar(x=port['Timeline'], y=port['Fuel_MT'], name='Port/Idle Fuel', marker_color='rgba(123,104,238,0.15)', marker_line_color='#7b68ee', marker_line_width=1.5), row=1, col=1)
-    if not sea.empty: fig.add_trace(go.Scatter(x=sea['Timeline'], y=sea['Daily_Burn'], name='Sea MT/day', mode='lines+markers', line=dict(color='#00e0b0', width=2, shape='spline')), row=1, col=1)
-    if not sea.empty: fig.add_trace(go.Scatter(x=sea['Timeline'], y=sea['Speed_kn'], name='Sea Speed', mode='lines+markers', line=dict(color='#c9a84c', width=2, shape='spline')), row=2, col=1)
-    
-    fig.update_layout(**_BL, title='Tri-State Fuel Consumption & Sea Speed Profile', barmode='group', showlegend=True, legend=dict(orientation='h', yanchor='bottom', y=1.02, xanchor='right', x=1))
-    fig.update_xaxes(tickangle=-45, automargin=True, **_AX); fig.update_yaxes(**_AX)
-    return fig
-
-# ═══════════════════════════════════════════════════════════════════════════════
-# MAIN UI EXECUTION
+# MAIN UI (Epistemological Segregation)
 # ═══════════════════════════════════════════════════════════════════════════════
 st.markdown(f"""
-<div class="hero"><div class="hero-left"><img src="data:image/svg+xml;base64,{_LOGO}" class="hero-logo" alt=""/><div><div class="hero-title">POSEIDON TITAN</div><div class="hero-sub">Fleet Consumables Intelligence Engine</div></div></div><div class="hero-badge"><span>KERNEL</span>&ensp;Tri-State AD-to-AD Ledge<br><span>PIPELINE</span>&ensp;Isolated Conformal Physics<br><span>BUILD</span>&ensp;v25.0 Masterpiece Deployment</div></div>""",unsafe_allow_html=True)
+<div class="hero"><div class="hero-left"><img src="data:image/svg+xml;base64,{_LOGO}" class="hero-logo" alt=""/><div><div class="hero-title">POSEIDON TITAN</div><div class="hero-sub">Forensic Accounting & Intelligence Engine</div></div></div><div class="hero-badge"><span>KERNEL</span>&ensp;Zero-Tolerance State Machine<br><span>PIPELINE</span>&ensp;Epistemological AI Isolation<br><span>BUILD</span>&ensp;v26.0 Masterpiece</div></div>""",unsafe_allow_html=True)
 
 uploaded_files=st.file_uploader('Upload vessel telemetry',accept_multiple_files=True,type=['xlsx','csv'],label_visibility='collapsed')
 
@@ -446,140 +366,95 @@ if not uploaded_files:
             <circle cx="40" cy="40" r="24" fill="none" stroke="#00e0b0" stroke-width="0.6" stroke-dasharray="3 8"><animateTransform attributeName="transform" type="rotate" from="360 40 40" to="0 40 40" dur="20s" repeatCount="indefinite"/></circle>
             <path d="M40 14L40 66 M22 26Q40 36 58 26 M20 40Q40 50 60 40 M22 54Q40 64 58 54" fill="none" stroke="#00e0b0" stroke-width="1.5" stroke-linecap="round" opacity=".35"/></svg>
         <h2 style="color:#fff;font-family:'Bricolage Grotesque';font-weight:800;font-size:1.4rem;margin-bottom:8px;letter-spacing:-0.03em">Awaiting Telemetry</h2>
-        <p style="color:#3a4d5e;font-size:.8rem;max-width:420px;margin:0 auto;line-height:1.7;font-family:'Hanken Grotesk'">Drop vessel noon-report files to execute the<br>AD-to-AD State Machine & Physics isolation.</p>
+        <p style="color:#3a4d5e;font-size:.8rem;max-width:420px;margin:0 auto;line-height:1.7;font-family:'Hanken Grotesk'">Drop vessel noon-report files to execute the<br>Zero-Tolerance State Machine & Physics isolation.</p>
     </div>""", unsafe_allow_html=True)
     st.stop()
 
-fleet_results=[]
 for f in uploaded_files:
     try:
-        with st.spinner(f'Processing {f.name}...'):
+        with st.spinner(f'Auditing {f.name}...'):
             df, vname, summary = master_ingest(f)
             
         if df.empty: st.warning(f'No valid events found in {f.name}. Check the template.'); continue
         
-        fleet_results.append({'name':vname,'summary':summary,'df':df})
         integrity = summary['integrity']
         ic = SC['VERIFIED'] if integrity >= 80 else (SC['LEDGER VARIANCE'] if integrity >= 50 else SC['GHOST BUNKER'])
         pc = 'p-ok' if integrity >= 80 else ('p-w' if integrity >= 50 else 'p-c')
         pt = 'NOMINAL' if integrity >= 80 else ('ATTENTION' if integrity >= 50 else 'CRITICAL')
 
-        st.markdown(f"""<div class="vcard"><div style="display:flex;justify-content:space-between;align-items:center"><div><div style="font-family:var(--fd);font-weight:800;font-size:1.3rem;color:#fff;letter-spacing:-0.03em">{vname}</div><div style="font-family:var(--fm);font-size:.62rem;color:var(--t2);margin-top:5px;letter-spacing:0.04em">{summary['cycles']} LEGS&ensp;·&ensp;{summary['total_days']:.0f} DAYS&ensp;·&ensp;{int(summary['total_nm']):,} NM&ensp;·&ensp;{summary['total_fuel']:,.1f} MT</div><div style="font-family:var(--fm);font-size:.55rem;color:var(--t3);margin-top:3px;letter-spacing:0.04em">Tri-State Isolation Active</div></div><div style="text-align:right"><span class="pill {pc}">{pt}</span><div style="font-family:var(--fd);font-weight:800;font-size:1.6rem;color:{ic};margin-top:5px">{integrity:.0f}%</div><div style="font-family:var(--fm);font-size:.5rem;color:var(--t3);text-transform:uppercase;letter-spacing:.1em">Leg Verification</div></div></div></div>""",unsafe_allow_html=True)
+        st.markdown(f"""<div class="vcard"><div style="display:flex;justify-content:space-between;align-items:center"><div><div style="font-family:var(--fd);font-weight:800;font-size:1.3rem;color:#fff;letter-spacing:-0.03em">{vname}</div><div style="font-family:var(--fm);font-size:.62rem;color:var(--t2);margin-top:5px;letter-spacing:0.04em">{summary['cycles']} LEGS&ensp;·&ensp;{summary['total_days']:.0f} DAYS&ensp;·&ensp;{int(summary['total_nm']):,} NM</div><div style="font-family:var(--fm);font-size:.55rem;color:var(--t3);margin-top:3px;letter-spacing:0.04em">Deterministic Core Active</div></div><div style="text-align:right"><span class="pill {pc}">{pt}</span><div style="font-family:var(--fd);font-weight:800;font-size:1.6rem;color:{ic};margin-top:5px">{integrity:.0f}%</div><div style="font-family:var(--fm);font-size:.5rem;color:var(--t3);text-transform:uppercase;letter-spacing:.1em">Audit Integrity</div></div></div></div>""",unsafe_allow_html=True)
 
-        cols=st.columns(6)
-        cols[0].metric('Total Fuel (MT)', f"{summary['total_fuel']:,.1f}")
-        cols[1].metric('Total Days', f"{summary['total_days']:.1f}")
-        cols[2].metric('Sea Burn (MT/d)', f"{summary['avg_sea_burn']:.1f}")
-        cols[3].metric('Total MELO (L)', f"{int(summary['total_melo']):,}")
-        cols[4].metric('Total CYLO (L)', f"{int(summary['total_cylo']):,}")
-        cols[5].metric('Total Anomalies', f"{summary['anomalies']}")
+        cols=st.columns(5)
+        cols[0].metric('Verified Fuel (MT)', f"{summary['total_fuel']:,.1f}")
+        cols[1].metric('Avg Sea Burn (MT/d)', f"{summary['avg_sea_burn']:.1f}")
+        cols[2].metric('Total Distance (NM)', f"{int(summary['total_nm']):,}")
+        cols[3].metric('Mass Anomalies', f"{summary['anomalies']}")
+        cols[4].metric('Quarantined Legs', f"{summary['quarantined']}")
 
-        # --- THE 6-TAB ENTERPRISE SUITE ---
-        tab1,tab2,tab3,tab4,tab5,tab6 = st.tabs(['TRI-STATE MATRIX','FUEL & PHYSICS','LUBRICANTS','ANOMALY REVIEW','AI EXPLAINER (SHAP)', 'CONFORMAL BOUNDS'])
+        # EPISTEMOLOGICAL TABS
+        tab1,tab2,tab3,tab4 = st.tabs(['IMMUTABLE LEDGER (Deterministic)','DIGITAL TWIN (AI Forensics)', 'CONFORMAL BOUNDS', 'QUARANTINE LOG'])
 
         with tab1:
-            dcfg={'Indicator':st.column_config.ImageColumn(' ',width='small'),'Timeline':st.column_config.TextColumn('TIMELINE',width='medium'),'Phase':st.column_config.TextColumn('LEG',width='small'),'Condition':st.column_config.TextColumn('COND',width='small'),'Route':st.column_config.TextColumn('ROUTE',width='large'),'Days':st.column_config.NumberColumn('DAYS',format='%.2f'),'Dist_NM':st.column_config.NumberColumn('DIST',format='%d'),'Speed_kn':st.column_config.NumberColumn('SPD',format='%.1f'),'Fuel_MT':st.column_config.NumberColumn('TOTAL FUEL',format='%.1f'),'Daily_Burn':st.column_config.ProgressColumn('MT/DAY',format='%.1f',min_value=0,max_value=float(max(df['Daily_Burn'].max()*1.15,1))),'MELO_L':st.column_config.NumberColumn('MELO',format='%d'),'CYLO_L':st.column_config.NumberColumn('CYLO',format='%d'),'Stoch_Var':st.column_config.NumberColumn('AI VAR±',format='%.1f'),'Status':st.column_config.TextColumn('STATUS',width='medium'),'Flags':st.column_config.TextColumn('FLAGS',width='medium'),'Date_Start_TS':None,'SHAP_Base':None,'SHAP_Prop':None,'SHAP_Mass':None,'SHAP_Weath':None,'SHAP_Lag':None,'Exp_Lower':None,'Exp_Upper':None,'Drift_MT':None, 'CargoQty':None}
+            st.markdown('<span style="font-family:var(--fm); font-size:0.7rem; color:var(--acc)">[START ROB] + [BUNKERS] - [END ROB] = [PHYSICAL BURN]</span>', unsafe_allow_html=True)
+            dcfg={'Indicator':st.column_config.ImageColumn(' ',width='small'),'Timeline':st.column_config.TextColumn('TIMELINE',width='medium'),'Phase':st.column_config.TextColumn('LEG',width='small'),'Days':st.column_config.NumberColumn('DAYS',format='%.2f'),'Speed_kn':st.column_config.NumberColumn('SPD',format='%.1f'),'FO_A_Start':st.column_config.NumberColumn('START ROB',format='%.1f'),'Bunk_FO':st.column_config.NumberColumn('+ BUNKERS',format='%.1f'),'FO_A_End':st.column_config.NumberColumn('- END ROB',format='%.1f'),'Phys_Burn':st.column_config.NumberColumn('= PHYS BURN',format='%.1f'),'Log_Burn':st.column_config.NumberColumn('LOG BURN',format='%.1f'),'Drift_MT':st.column_config.NumberColumn('DRIFT ±',format='%.1f'),'Daily_Burn':st.column_config.NumberColumn('MT/DAY',format='%.1f'),'Status':st.column_config.TextColumn('STATUS',width='medium'),'Route':None,'CargoQty':None,'Condition':None,'Date_Start_TS':None,'Flags':None,'AI_Exp':None,'Stoch_Var':None,'SHAP_Base':None,'SHAP_Prop':None,'SHAP_Mass':None,'SHAP_Weath':None,'Exp_Lower':None,'Exp_Upper':None,'Dist_NM':None}
             st.dataframe(df,column_config=dcfg,hide_index=True,use_container_width=True,height=min(500,38+len(df)*35))
-            buf=io.BytesIO(); exp=df.drop(columns=['Indicator','Date_Start_TS'],errors='ignore')
-            with pd.ExcelWriter(buf,engine='openpyxl') as w: exp.to_excel(w,index=False,sheet_name='Audit')
-            buf.seek(0)
-            st.download_button('Export Tri-State Ledger',data=buf,file_name=f"{vname.replace(' ','_')}_LEDGER.xlsx",key=f"dl_{vname}")
 
         with tab2:
-            st.plotly_chart(chart_fuel(df),use_container_width=True,config={'displayModeBar':False})
-
-        with tab3:
-            if df['MELO_L'].sum()+df['CYLO_L'].sum()>0:
-                fig_lube = go.Figure()
-                if df['MELO_L'].sum() > 0: fig_lube.add_trace(go.Bar(x=df['Timeline'], y=df['MELO_L'], name='MELO', marker_color='rgba(0,224,176,0.12)', marker_line_color='#00e0b0', marker_line_width=1.3))
-                if df['CYLO_L'].sum() > 0: fig_lube.add_trace(go.Bar(x=df['Timeline'], y=df['CYLO_L'], name='CYLO', marker_color='rgba(123,104,238,0.12)', marker_line_color='#7b68ee', marker_line_width=1.3))
-                fig_lube.update_layout(**_BL, title='Lubricant Consumption (Liters)', barmode='group', showlegend=True, yaxis=dict(title='L', **_AX), xaxis=dict(automargin=True, **_AX))
-                fig_lube.update_xaxes(tickangle=-45)
-                st.plotly_chart(fig_lube, use_container_width=True, config={'displayModeBar':False})
-            else:
-                st.info('No lubricant consumption data detected.')
-
-        with tab4:
-            anomalies = df[df['Status'] != 'VERIFIED']
-            if anomalies.empty:
-                st.success("Zero anomalies detected. Fleet reporting is completely nominal.")
-            else:
-                for _,row in anomalies.iterrows():
-                    s = row['Status']; sc = SC.get(s,'#fff'); ri = tuple(int(sc.lstrip('#')[i:i+2],16) for i in (0,2,4))
-                    ai_v = row.get('Stoch_Var',0.0)
-                    
-                    desc = f"Unknown Exception in {row['Phase']} phase."
-                    if row['Phase'] == 'PORT': desc = f"Mass Balance Error. Net fuel calculated at {row['Fuel_MT']:.1f} MT. Check port invoices for missing bunker receipts."
-                    elif row['Phase'] == 'SEA': desc = f"Thermodynamic Anomaly. Reported burn of {row['Daily_Burn']:.1f} MT/d breached the Conformal limits (±{ai_v:.1f} MT) generated by the physics engine."
-                    
-                    st.markdown(f'<div class="acard" style="border:1px solid rgba({ri[0]},{ri[1]},{ri[2]},.12);border-left:3px solid {sc}"><div style="display:flex;justify-content:space-between;align-items:center"><div><span style="color:{sc};font-weight:700;font-size:.7rem;letter-spacing:.08em;font-family:var(--fm)">{s}</span><span style="color:var(--t3);font-size:.7rem;margin-left:10px;font-family:var(--fm)">{row["Timeline"]}</span></div><span style="color:var(--t2);font-size:.68rem;font-family:var(--fb)">{row["Route"]}</span></div><div style="color:var(--t2);font-size:.7rem;margin-top:8px;line-height:1.6;font-family:var(--fb)">{desc} <br><span style="color:var(--amber);font-family:var(--fm);font-size:0.6rem">[{row["Flags"]}]</span></div></div>',unsafe_allow_html=True)
-
-        with tab5:
-            st.markdown('<h3 style="color:#fff;font-family:var(--fd);font-size:1.2rem;margin-bottom:10px;margin-top:10px">Thermodynamic Logic Extraction (Sea Legs Only)</h3>', unsafe_allow_html=True)
-            sea_df = df[df['Phase'] == 'SEA']
+            st.markdown('<h3 style="color:#fff;font-family:var(--fd);font-size:1.2rem;margin-bottom:10px;margin-top:10px">Thermodynamic Explanation (Sea Legs Only)</h3>', unsafe_allow_html=True)
+            sea_df = df[(df['Phase'] == 'SEA') & (df['Status'] == 'VERIFIED')]
             shap_ran = sea_df['SHAP_Base'].abs().sum() > 0 if 'SHAP_Base' in sea_df.columns else False
             
             if not shap_ran:
-                st.warning("⚠️ **AI EXPLAINABILITY OFFLINE:** The XGBoost engine requires at least 2 valid Sea Legs (>2.0 knots) to map physical hydrodynamics. Port operations are physically excluded.")
+                st.warning("⚠️ **AI EXPLAINABILITY OFFLINE:** Insufficient valid Sea Legs (>2.0 knots) to train the hydrodynamic model.")
             else:
-                anomalies_s = sea_df[sea_df['Status'] != 'VERIFIED']
-                if anomalies_s.empty:
-                    st.success("No sea anomalies detected. View the AI's physics map for any valid ocean crossing below.")
-                    options = sea_df['Timeline'].tolist()
-                    sel = st.selectbox('Select Sea Passage', options, key=f'shap_{vname}')
-                    tr = sea_df[sea_df['Timeline']==sel].iloc[0]
-                else:
-                    st.write("Select an anomalous Sea Passage to view the exact physics receipt vs reported fuel.")
-                    options = anomalies_s['Timeline'].tolist()
-                    sel = st.selectbox('Select Flagged Passage', options, key=f'shap_{vname}')
-                    tr = anomalies_s[anomalies_s['Timeline']==sel].iloc[0]
+                options = sea_df['Timeline'].tolist()
+                sel = st.selectbox('Select Verified Sea Passage', options, key=f'shap_{vname}')
+                tr = sea_df[sea_df['Timeline']==sel].iloc[0]
                 
-                exp_burn = tr['SHAP_Base'] + tr['SHAP_Prop'] + tr['SHAP_Mass'] + tr['SHAP_Weath'] + tr['SHAP_Lag']
+                exp_burn = tr['SHAP_Base'] + tr['SHAP_Prop'] + tr['SHAP_Mass'] + tr['SHAP_Weath']
                 
                 fig_w = go.Figure(go.Waterfall(
                     name="SHAP", orientation="v",
-                    measure=["absolute","relative","relative","relative","relative","total"],
-                    x=["Fleet<br>Baseline", "Speed<br>& Froude", "Cargo<br>Mass", "Weather<br>& Drag", "Lag &<br>Bias", "Expected<br>Actual Burn"],
+                    measure=["absolute","relative","relative","relative","total"],
+                    x=["Fleet<br>Baseline", "Speed<br>& Froude", "Cargo<br>Mass", "Weather<br>& Drag", "Expected<br>Burn"],
                     textposition="auto", insidetextanchor="middle",
-                    text=[f"{tr['SHAP_Base']:.1f}",f"{tr['SHAP_Prop']:+.1f}",f"{tr['SHAP_Mass']:+.1f}",f"{tr['SHAP_Weath']:+.1f}",f"{tr['SHAP_Lag']:+.1f}",f"{exp_burn:.1f}"],
-                    y=[tr['SHAP_Base'],tr['SHAP_Prop'],tr['SHAP_Mass'],tr['SHAP_Weath'],tr['SHAP_Lag'],0],
+                    text=[f"{tr['SHAP_Base']:.1f}",f"{tr['SHAP_Prop']:+.1f}",f"{tr['SHAP_Mass']:+.1f}",f"{tr['SHAP_Weath']:+.1f}",f"{exp_burn:.1f}"],
+                    y=[tr['SHAP_Base'],tr['SHAP_Prop'],tr['SHAP_Mass'],tr['SHAP_Weath'],0],
                     connector={"line":{"color":"rgba(201,168,76,0.15)"}},
                     decreasing={"marker":{"color":"#00e0b0"}}, increasing={"marker":{"color":"#e63946"}}, totals={"marker":{"color":"#7b68ee"}}
                 ))
-                fig_w.update_layout(paper_bgcolor='rgba(0,0,0,0)',plot_bgcolor='rgba(0,0,0,0)',font_color="#dce8f0",height=480,margin=dict(t=60,b=80,l=10,r=10),title=dict(text=f"Physics Audit: {tr['Route']} ({tr['Days']} Days)",font=dict(color='#ffffff',size=16,family='Bricolage Grotesque')),yaxis=dict(title='MT/Day',**_AX), xaxis=dict(automargin=True, tickangle=0, **_AX))
+                fig_w.update_layout(paper_bgcolor='rgba(0,0,0,0)',plot_bgcolor='rgba(0,0,0,0)',font_color="#dce8f0",height=480,margin=dict(t=60,b=80,l=10,r=10),title=dict(text=f"Physics Audit: {tr['Route']} ({tr['Days']} Days at {tr['Speed_kn']}kn)",font=dict(color='#ffffff',size=16,family='Bricolage Grotesque')),yaxis=dict(title='MT/Day', gridcolor='rgba(201,168,76,0.04)'), xaxis=dict(automargin=True, tickangle=0))
                 st.plotly_chart(fig_w,use_container_width=True,config={'displayModeBar':False})
                 
-                st.info(f"**Forensic Translation:** The AI isolates the pure physics of this ocean crossing. Fleet baseline = **{tr['SHAP_Base']:.1f} MT/d**. Speed Effort: **{tr['SHAP_Prop']:+.1f}**. Mass: **{tr['SHAP_Mass']:+.1f}**. Environmental Drag: **{tr['SHAP_Weath']:+.1f}**. Memory Bias: **{tr['SHAP_Lag']:+.1f}**. \n\nExpected Mathematical Burn: **{exp_burn:.1f} MT/d** vs Physically Reported: **{tr['Daily_Burn']:.1f} MT/d**.")
+                st.info(f"**Forensic Context:** The AI isolated the physics of this ocean crossing. Expected Mathematical Burn: **{exp_burn:.1f} MT/d** vs Physically Audited Burn: **{tr['Daily_Burn']:.1f} MT/d**.")
 
-        with tab6:
-            sea_df = df[df['Phase'] == 'SEA']
+        with tab3:
+            sea_df = df[(df['Phase'] == 'SEA') & (df['Status'] == 'VERIFIED')]
             if 'Exp_Lower' in sea_df.columns and sea_df['Exp_Lower'].abs().sum() > 0:
                 fig_c = go.Figure()
                 fig_c.add_trace(go.Scatter(x=sea_df['Timeline'].tolist() + sea_df['Timeline'].tolist()[::-1],
                                          y=sea_df['Exp_Upper'].tolist() + sea_df['Exp_Lower'].tolist()[::-1],
                                          fill='toself', fillcolor='rgba(123,104,238,0.15)', line=dict(color='rgba(255,255,255,0)'),
                                          hoverinfo="skip", name='90% Conformal Interval'))
-                fig_c.add_trace(go.Scatter(x=sea_df['Timeline'], y=(sea_df['Exp_Lower']+sea_df['Exp_Upper'])/2, name="Expected Mean", line=dict(color="#7b68ee", width=2, dash='dot')))
-                fig_c.add_trace(go.Scatter(x=sea_df['Timeline'], y=sea_df['Daily_Burn'], name="Actual Burn (FO_A)", mode='lines+markers', line=dict(color="#00e0b0", width=2), marker=dict(size=6, color="#fff")))
+                fig_c.add_trace(go.Scatter(x=sea_df['Timeline'], y=sea_df['AI_Exp'], name="Expected Mean", line=dict(color="#7b68ee", width=2, dash='dot')))
+                fig_c.add_trace(go.Scatter(x=sea_df['Timeline'], y=sea_df['Daily_Burn'], name="Audited Burn", mode='lines+markers', line=dict(color="#00e0b0", width=2), marker=dict(size=6, color="#fff")))
                 
-                fig_c.update_layout(**_BL, title='Conformal Bounds (Sea Legs Only)', height=500, yaxis=dict(title='MT/day', **_AX), xaxis=dict(tickangle=-45, automargin=True, **_AX))
+                fig_c.update_layout(paper_bgcolor='rgba(0,0,0,0)',plot_bgcolor='rgba(0,0,0,0)',font_color="#dce8f0", title='Conformal Propulsion Bounds (Verified Sea Legs Only)', height=500, yaxis=dict(title='MT/day', gridcolor='rgba(201,168,76,0.04)'), xaxis=dict(tickangle=-45, automargin=True, gridcolor='rgba(201,168,76,0.04)'))
                 st.plotly_chart(fig_c, use_container_width=True, config={'displayModeBar':False})
-                st.caption("The purple envelope represents the absolute physical limits of the vessel based on XGBoost variance. Port operations are strictly excluded from this visualization to guarantee accuracy.")
             else:
-                st.info("Insufficient sea data to generate Conformal Prediction Bounds.")
+                st.info("Insufficient verified sea data to generate prediction bounds.")
+
+        with tab4:
+            quarantined = df[df['Status'].str.contains('QUARANTINE|GHOST')]
+            if quarantined.empty:
+                st.success("Zero structural anomalies detected. All chronological chains and tank soundings are intact.")
+            else:
+                for _,row in quarantined.iterrows():
+                    s = row['Status']; c = '#e63946'
+                    desc = f"Fatal Audit Exception: {row['Flags']}"
+                    st.markdown(f'<div class="acard"><div style="display:flex;justify-content:space-between;align-items:center"><div><span style="color:{c};font-weight:700;font-size:.7rem;letter-spacing:.08em;font-family:var(--fm)">{s}</span><span style="color:var(--t3);font-size:.7rem;margin-left:10px;font-family:var(--fm)">{row["Timeline"]}</span></div><span style="color:var(--t2);font-size:.68rem;font-family:var(--fb)">{row["Route"]}</span></div><div style="color:var(--t2);font-size:.7rem;margin-top:8px;line-height:1.6;font-family:var(--fb)">{desc}</div></div>',unsafe_allow_html=True)
 
         st.divider()
     except Exception:
         st.error(f'System Failure on file: {f.name}')
         with st.expander('View Traceback'): st.code(traceback.format_exc())
-
-if len(fleet_results)>1:
-    st.markdown('<h2 style="color:#fff;font-family:var(--fd);margin-top:10px">Fleet Comparison Matrix</h2>',unsafe_allow_html=True)
-    fleet_rows=[{'Vessel':r['name'],'Legs':r['summary']['cycles'],'Verified':f"{r['summary']['integrity']:.1f}%",'Fuel MT':r['summary']['total_fuel'],'Sea Burn':r['summary']['avg_sea_burn'],'Anomalies':r['summary']['anomalies'],'NM':int(r['summary']['total_nm']),'Days':r['summary']['total_days']} for r in fleet_results]
-    st.dataframe(pd.DataFrame(fleet_rows),hide_index=True,use_container_width=True)
-    
-    fig_f=go.Figure()
-    for r in fleet_results:
-        fig_f.add_trace(go.Bar(name=r['name'],x=['Total Fuel (MT)','Sea Burn (x10)','Anomalies (x10)'],y=[r['summary']['total_fuel'],r['summary']['avg_sea_burn']*10,r['summary']['anomalies']*10]))
-    fig_f.update_layout(**_BL,title='Cross-Fleet Performance',barmode='group',yaxis=dict(**_AX),xaxis=dict(**_AX))
-    st.plotly_chart(fig_f,use_container_width=True,config={'displayModeBar':False})
