@@ -393,6 +393,49 @@ def execute_ai_physics(trip_df, min_speed):
     return trip_df, ai_status_msg
 
 # ═══════════════════════════════════════════════════════════════════════════════
+# PIPELINE ORCHESTRATOR (CACHED FOR MAXIMUM SPEED)
+# ═══════════════════════════════════════════════════════════════════════════════
+@st.cache_data(show_spinner=False)
+def run_pipeline(uploaded_file_bytes, filename, min_speed, ghost_sea, ghost_port):
+    """
+    By passing raw bytes to the cached function instead of the Streamlit UploadedFile object,
+    and passing the dynamic thresholds, we ensure this entire math pipeline only runs ONCE per file drop.
+    """
+    try:
+        class DummyFile:
+            def __init__(self, b, n): self.b, self.name = b, n
+            def getvalue(self): return self.b
+        
+        dummy = DummyFile(uploaded_file_bytes, filename)
+        parsed_df, vname = semantic_parse(dummy)
+        trip_df, cum_drift = build_state_machine(parsed_df, min_speed, ghost_sea, ghost_port)
+        trip_df, ai_msg = execute_ai_physics(trip_df, min_speed)
+        
+        quarantined = len(trip_df[trip_df['Status'].str.contains('QUARANTINE')])
+        valid_sea = trip_df[(trip_df['Phase'] == 'SEA') & (trip_df['Status'] == 'VERIFIED')]
+        avg_sea = valid_sea['Phys_Burn'].sum() / valid_sea['Days'].sum() if valid_sea['Days'].sum() > 0 else 0.0
+        trip_df['Total_CYLO'] = trip_df.get('HSCYLO_L',0) + trip_df.get('LSCYLO_L',0) + trip_df.get('CYLO_GEN_L',0)
+        
+        summary = {
+            'vname': vname,
+            'integrity': round((len(trip_df) - quarantined) / len(trip_df) * 100, 1) if not trip_df.empty else 0,
+            'avg_dqi': round(trip_df['DQI'].mean(), 0) if not trip_df.empty else 0,
+            'total_fuel': round(trip_df['Phys_Burn'].sum(skipna=True), 1),
+            'avg_sea_burn': round(avg_sea, 1),
+            'total_nm': round(trip_df['Dist_NM'].sum(), 0),
+            'total_days': round(trip_df['Days'].sum(), 1),
+            'total_melo': round(trip_df.get('MELO_L', pd.Series([0])).sum(), 0),
+            'total_cylo': round(trip_df['Total_CYLO'].sum(), 0),
+            'cycles': len(trip_df),
+            'quarantined': quarantined,
+            'anomalies': len(trip_df[trip_df['Status'].isin(['GHOST BUNKER', 'STAT OUTLIER'])]),
+            'ai_msg': ai_msg
+        }
+        return trip_df, summary, cum_drift, None
+    except ValueError as e: return pd.DataFrame(), None, None, f"Parsing Rejected: {str(e)}"
+    except Exception as e: return pd.DataFrame(), None, None, f"System Crash: {str(e)}"
+
+# ═══════════════════════════════════════════════════════════════════════════════
 # CHARTS & UI CONFIG
 # ═══════════════════════════════════════════════════════════════════════════════
 _BL=dict(paper_bgcolor='rgba(0,0,0,0)',plot_bgcolor='rgba(0,0,0,0)',hovermode='x unified',font=dict(family='Hanken Grotesk',color='#dce8f0'),margin=dict(l=0,r=0,t=55,b=20))
@@ -429,7 +472,7 @@ def chart_cum_drift(cum_drift):
 # ═══════════════════════════════════════════════════════════════════════════════
 # MAIN FRONTEND EXECUTION
 # ═══════════════════════════════════════════════════════════════════════════════
-st.markdown(f"""<div class="hero"><div class="hero-left"><img src="data:image/svg+xml;base64,{LOGO_SVG}" class="hero-logo" alt=""/><div><div class="hero-title">POSEIDON TITAN</div><div class="hero-sub">Enterprise Forensic Engine</div></div></div><div class="hero-badge"><span>KERNEL</span>&ensp;Data-Driven PIML Math<br><span>PIPELINE</span>&ensp;Fleet Master Database<br><span>BUILD</span>&ensp;v50.0 Masterpiece</div></div>""",unsafe_allow_html=True)
+st.markdown(f"""<div class="hero"><div class="hero-left"><img src="data:image/svg+xml;base64,{LOGO_SVG}" class="hero-logo" alt=""/><div><div class="hero-title">POSEIDON TITAN</div><div class="hero-sub">Enterprise Forensic Engine</div></div></div><div class="hero-badge"><span>KERNEL</span>&ensp;Data-Driven PIML Math<br><span>PIPELINE</span>&ensp;Optimized Render Cache<br><span>BUILD</span>&ensp;v50.0 Masterpiece</div></div>""",unsafe_allow_html=True)
 
 files = st.file_uploader('Upload vessel telemetry', accept_multiple_files=True, type=['xlsx','csv'], label_visibility='collapsed')
 
@@ -440,50 +483,29 @@ if not files:
 fleet_results = []
 for f in files:
     with st.spinner(f'Auditing {f.name}...'):
+        file_bytes = f.getvalue()
+        
+        # We pre-parse just to get the name for the Fleet Database lookup
         try:
-            # 1. Semantic Parse to get Vessel Name
-            parsed_df, vname = semantic_parse(f)
+            class DummyFile:
+                def __init__(self, b, n): self.b, self.name = b, n
+                def getvalue(self): return self.b
+            _, vname = semantic_parse(DummyFile(file_bytes, f.name))
             
-            # 2. Fleet Master Dynamic Lookup
             if vname in fleet_db.index:
                 v_props = fleet_db.loc[vname]
                 min_speed = float(v_props.get('Min_Speed_kn', 4.0))
                 ghost_sea = float(v_props.get('Ghost_Tol_Sea', -3.0))
                 ghost_port = float(v_props.get('Ghost_Tol_Port', -5.0))
-                st.toast(f"⚓ Fleet Master Synced: {vname}")
             else:
-                # Safe generics if not found in CSV
                 min_speed, ghost_sea, ghost_port = 4.0, -3.0, -5.0
-                st.toast(f"⚠️ {vname} not found in Fleet Master. Using generic tolerances.")
-
-            # 3. Execute Pipelines with Dynamic Tolerances
-            trip_df, cum_drift = build_state_machine(parsed_df, min_speed, ghost_sea, ghost_port)
-            trip_df, ai_msg = execute_ai_physics(trip_df, min_speed)
+                
+            # Execute Cached Pipeline (Massive Speed Increase)
+            trip_df, sum_data, cum_drift, err = run_pipeline(file_bytes, f.name, min_speed, ghost_sea, ghost_port)
             
-            # 4. Generate Summaries
-            quarantined = len(trip_df[trip_df['Status'].str.contains('QUARANTINE')])
-            valid_sea = trip_df[(trip_df['Phase'] == 'SEA') & (trip_df['Status'] == 'VERIFIED')]
-            avg_sea = valid_sea['Phys_Burn'].sum() / valid_sea['Days'].sum() if valid_sea['Days'].sum() > 0 else 0.0
-            trip_df['Total_CYLO'] = trip_df.get('HSCYLO_L',0) + trip_df.get('LSCYLO_L',0) + trip_df.get('CYLO_GEN_L',0)
-            
-            sum_data = {
-                'vname': vname,
-                'integrity': round((len(trip_df) - quarantined) / len(trip_df) * 100, 1) if not trip_df.empty else 0,
-                'avg_dqi': round(trip_df['DQI'].mean(), 0) if not trip_df.empty else 0,
-                'total_fuel': round(trip_df['Phys_Burn'].sum(skipna=True), 1),
-                'avg_sea_burn': round(avg_sea, 1),
-                'total_nm': round(trip_df['Dist_NM'].sum(), 0),
-                'total_days': round(trip_df['Days'].sum(), 1),
-                'total_melo': round(trip_df.get('MELO_L', pd.Series([0])).sum(), 0),
-                'total_cylo': round(trip_df['Total_CYLO'].sum(), 0),
-                'cycles': len(trip_df),
-                'quarantined': quarantined,
-                'anomalies': len(trip_df[trip_df['Status'].isin(['GHOST BUNKER', 'STAT OUTLIER'])]),
-                'ai_msg': ai_msg
-            }
-            err = None
-        except ValueError as e: trip_df, sum_data, cum_drift, err = pd.DataFrame(), None, None, f"Parsing Rejected: {str(e)}"
-        except Exception as e: trip_df, sum_data, cum_drift, err = pd.DataFrame(), None, None, f"System Crash: {str(e)}"
+        except Exception as e:
+            err = f"Initialization Error: {str(e)}"
+            trip_df = pd.DataFrame()
 
     if err:
         st.error(f"**Rejected {f.name}:** {err}"); continue
@@ -551,26 +573,32 @@ for f in files:
             fig_w.update_layout(paper_bgcolor='rgba(0,0,0,0)', plot_bgcolor='rgba(0,0,0,0)', height=300, title=dict(text=f"Mathematical Delta Breakdown: {tr['Route']} ({tr['Speed_kn']}kn)", font=dict(color='#fff')), yaxis=dict(gridcolor='rgba(201,168,76,0.04)'), margin=dict(t=40,b=20,l=0,r=0))
             st.plotly_chart(fig_w, use_container_width=True, config={'displayModeBar':False})
             
-            # --- 2. THE STOCHASTIC PDF (P-VALUE INTEGRAL) ---
+            # --- 2. THE STOCHASTIC PDF (P-VALUE INTEGRAL) [OPTIMIZED RENDER & UI] ---
             sigma = max(tr['Stoch_Var'] / 1.645, 0.1) 
-            x_vals = np.linspace(eb - 4*sigma, eb + 4*sigma, 200)
+            # Decimated vectors (100 points instead of 200) for instant browser rendering
+            x_vals = np.linspace(eb - 4*sigma, eb + 4*sigma, 100)
             y_vals = np.exp(-0.5 * ((x_vals - eb) / sigma)**2) / (sigma * np.sqrt(2 * np.pi))
             
-            x_fill = np.linspace(tr['Exp_Lower'], tr['Exp_Upper'], 100)
+            x_fill = np.linspace(tr['Exp_Lower'], tr['Exp_Upper'], 50)
             y_fill = np.exp(-0.5 * ((x_fill - eb) / sigma)**2) / (sigma * np.sqrt(2 * np.pi))
             
             fig_stoch = go.Figure()
             fig_stoch.add_trace(go.Scatter(x=np.concatenate([x_fill, x_fill[::-1]]), y=np.concatenate([y_fill, np.zeros_like(y_fill)]), fill='toself', fillcolor='rgba(123,104,238,0.2)', line=dict(color='rgba(255,255,255,0)'), hoverinfo='skip', showlegend=False))
             fig_stoch.add_trace(go.Scatter(x=x_vals, y=y_vals, mode='lines', line=dict(color='rgba(123,104,238,0.8)', width=2), showlegend=False))
             fig_stoch.add_trace(go.Scatter(x=[eb, eb], y=[0, max(y_vals)], mode="lines", line=dict(color="#7b68ee", width=2, dash="dot"), showlegend=False))
-            fig_stoch.add_trace(go.Scatter(x=[eb], y=[max(y_vals)*1.05], mode="text", text=["AI Mean"], textfont=dict(color="#7b68ee"), showlegend=False))
+            
+            # Shifted labels upward (1.15x) to prevent clipping
+            fig_stoch.add_trace(go.Scatter(x=[eb], y=[max(y_vals)*1.15], mode="text", text=["AI Mean"], textfont=dict(color="#7b68ee"), showlegend=False))
             
             actual_color = "#00e0b0" if (tr['Daily_Burn'] >= tr['Exp_Lower'] and tr['Daily_Burn'] <= tr['Exp_Upper']) else "#e63946"
             y_actual = np.exp(-0.5 * ((tr['Daily_Burn'] - eb) / sigma)**2) / (sigma * np.sqrt(2 * np.pi))
             fig_stoch.add_trace(go.Scatter(x=[tr['Daily_Burn'], tr['Daily_Burn']], y=[0, y_actual], mode="lines", line=dict(color=actual_color, width=2), showlegend=False))
-            fig_stoch.add_trace(go.Scatter(x=[tr['Daily_Burn']], y=[y_actual + max(y_vals)*0.08], mode="markers+text", marker=dict(color=actual_color, size=12, symbol="diamond"), text=["Actual"], textfont=dict(color=actual_color, weight="bold"), textposition="top center", showlegend=False))
             
-            fig_stoch.update_layout(title=dict(text="Conformal Probability Density", font=dict(size=13, color='#fff')), height=200, yaxis=dict(showticklabels=False, showgrid=False, zeroline=False), xaxis=dict(title="MT/day", gridcolor='rgba(201,168,76,0.04)'), paper_bgcolor='rgba(0,0,0,0)', plot_bgcolor='rgba(0,0,0,0)', font_color="#dce8f0", margin=dict(t=40, b=30, l=0, r=0))
+            # Shifted Actual label upward (0.15x offset)
+            fig_stoch.add_trace(go.Scatter(x=[tr['Daily_Burn']], y=[y_actual + max(y_vals)*0.15], mode="markers+text", marker=dict(color=actual_color, size=12, symbol="diamond"), text=["Actual"], textfont=dict(color=actual_color, weight="bold"), textposition="top center", showlegend=False))
+            
+            # Taller chart (300px) with padded margins (t=50, b=40) so the top text never gets cut off
+            fig_stoch.update_layout(title=dict(text="Conformal Probability Density", font=dict(size=13, color='#fff')), height=300, yaxis=dict(showticklabels=False, showgrid=False, zeroline=False), xaxis=dict(title="MT/day", gridcolor='rgba(201,168,76,0.04)'), paper_bgcolor='rgba(0,0,0,0)', plot_bgcolor='rgba(0,0,0,0)', font_color="#dce8f0", margin=dict(t=50, b=40, l=20, r=20))
             st.plotly_chart(fig_stoch, use_container_width=True, config={'displayModeBar':False})
             
             # P-Value Calculus
