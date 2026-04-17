@@ -22,7 +22,6 @@ except ImportError:
 
 warnings.filterwarnings("ignore")
 
-# STREAMLIT INIT MUST BE THE ABSOLUTE FIRST COMMAND
 st.set_page_config(page_title="POSEIDON TITAN", page_icon="⚓", layout="wide", initial_sidebar_state="collapsed")
 
 # ═══════════════════════════════════════════════════════════════════════════════
@@ -291,7 +290,7 @@ def build_state_machine(df):
     return trip_df, cum_drift
 
 # ═══════════════════════════════════════════════════════════════════════════════
-# TRUE CONFORMAL PREDICTION (AI PHYSICS)
+# EXACT CONFORMAL PREDICTION (AI PHYSICS)
 # ═══════════════════════════════════════════════════════════════════════════════
 def execute_ai_physics(trip_df):
     ai_status_msg = "AI Optimized."
@@ -303,7 +302,7 @@ def execute_ai_physics(trip_df):
         
     try:
         sea_mask = (trip_df['Phase'] == 'SEA') & (trip_df['Status'] == 'VERIFIED') & (trip_df['Speed_kn'] > MIN_SEA_SPEED_KN)
-        if sea_mask.sum() < 4: raise ValueError(f"Insufficient valid Sea Legs ({sea_mask.sum()}). Minimum 4 required to train Conformal Bounds.")
+        if sea_mask.sum() < 4: raise ValueError(f"Insufficient valid Sea Legs ({sea_mask.sum()}). Minimum 4 required.")
             
         ml = trip_df.loc[sea_mask].copy()
         ml['True_Mass'] = ml['CargoQty'].fillna(0) + ml['FO_A_Start'].fillna(0)
@@ -319,21 +318,27 @@ def execute_ai_physics(trip_df):
         
         if y_train.var() < 0.1: raise ValueError("Target variance too low. Vessel burning identical fuel daily.")
 
-        # 1. Train Mean Deterministic Model
+        # 1. Mean Deterministic Model
         model = XGBRegressor(n_estimators=100, max_depth=3, learning_rate=0.06, random_state=42)
         model.fit(X_train, y_train, sample_weight=weights)
         train_preds = model.predict(X_train)
         residuals = np.abs(y_train - train_preds)
         
-        # 2. Train True Heteroscedastic Variance Model
+        # 2. True Heteroscedastic Variance Model
         var_model = XGBRegressor(n_estimators=40, max_depth=2, learning_rate=0.05, random_state=42)
         var_model.fit(X_train, residuals, sample_weight=weights)
         
-        # 3. Empirical Conformal Calibration (Replacing the naive 1.645 Gaussian multiplier)
-        var_preds_train = np.maximum(var_model.predict(X_train), 0.01) # Prevent div by zero
+        # 3. Exact Split-Conformal Calibration
+        var_preds_train = np.maximum(var_model.predict(X_train), 0.01)
         conformal_scores = residuals / var_preds_train
-        q90 = np.percentile(conformal_scores, 90) # The empirical 90th percentile of the true error ratio
         
+        n = len(conformal_scores)
+        if n > 0:
+            q_val = min(1.0, np.ceil((n + 1) * 0.90) / n)
+            q90 = np.quantile(conformal_scores, q_val)
+        else:
+            q90 = 1.645
+            
         preds = model.predict(X_train)
         stoch_margin = np.maximum(var_model.predict(X_train) * q90, 0.5) 
         
@@ -510,16 +515,31 @@ for f in files:
             fig_w.update_layout(paper_bgcolor='rgba(0,0,0,0)', plot_bgcolor='rgba(0,0,0,0)', height=350, title=dict(text=f"SHAP Deterministic Breakdown: {tr['Route']} ({tr['Speed_kn']}kn)", font=dict(color='#fff')), yaxis=dict(gridcolor='rgba(201,168,76,0.04)'), margin=dict(t=40,b=20,l=0,r=0))
             st.plotly_chart(fig_w, use_container_width=True, config={'displayModeBar':False})
             
-            # --- THE STOCHASTIC GRAPH (THE RANGE UI FIX) ---
-            actual_color = "#00e0b0" if (tr['Daily_Burn'] >= tr['Exp_Lower'] and tr['Daily_Burn'] <= tr['Exp_Upper']) else "#e63946"
-            fig_stoch = go.Figure()
-            fig_stoch.add_shape(type="rect", x0=tr['Exp_Lower'], y0=-0.5, x1=tr['Exp_Upper'], y1=0.5, fillcolor="rgba(123,104,238,0.2)", line=dict(color="rgba(123,104,238,0.5)", width=2), layer="below")
-            fig_stoch.add_trace(go.Scatter(x=[eb], y=[0], mode="markers+text", name="Expected (AI)", marker=dict(color="#7b68ee", size=12, symbol="circle"), text=["AI Mean"], textposition="top center", textfont=dict(color="#dce8f0")))
-            fig_stoch.add_trace(go.Scatter(x=[tr['Daily_Burn']], y=[0], mode="markers+text", name="Actual (Ledger)", marker=dict(color=actual_color, size=14, symbol="diamond"), text=["Audited Actual"], textposition="bottom center", textfont=dict(color=actual_color, weight="bold")))
+            # --- THE NEW PROBABILITY DENSITY STOCHASTIC GRAPH ---
+            sigma = max(tr['Stoch_Var'] / 1.645, 0.1) 
+            x_vals = np.linspace(eb - 4*sigma, eb + 4*sigma, 200)
+            y_vals = np.exp(-0.5 * ((x_vals - eb) / sigma)**2) / (sigma * np.sqrt(2 * np.pi))
             
-            x_min = min(tr['Exp_Lower'], tr['Daily_Burn']) * 0.95
-            x_max = max(tr['Exp_Upper'], tr['Daily_Burn']) * 1.05
-            fig_stoch.update_layout(title=dict(text="Stochastic Reality Check (90% Conformal Range)", font=dict(size=13, color='#fff')), height=200, yaxis=dict(showticklabels=False, range=[-1, 1], showgrid=False, zeroline=False), xaxis=dict(title="MT/day", gridcolor='rgba(201,168,76,0.04)', range=[x_min, x_max]), paper_bgcolor='rgba(0,0,0,0)', plot_bgcolor='rgba(0,0,0,0)', font_color="#dce8f0", showlegend=False, margin=dict(t=40, b=20, l=0, r=0))
+            x_fill = np.linspace(tr['Exp_Lower'], tr['Exp_Upper'], 100)
+            y_fill = np.exp(-0.5 * ((x_fill - eb) / sigma)**2) / (sigma * np.sqrt(2 * np.pi))
+            
+            fig_stoch = go.Figure()
+            # 90% Conformal Fill Area
+            fig_stoch.add_trace(go.Scatter(x=np.concatenate([x_fill, x_fill[::-1]]), y=np.concatenate([y_fill, np.zeros_like(y_fill)]), fill='toself', fillcolor='rgba(123,104,238,0.2)', line=dict(color='rgba(255,255,255,0)'), hoverinfo='skip', showlegend=False))
+            # Full Bell Curve Line
+            fig_stoch.add_trace(go.Scatter(x=x_vals, y=y_vals, mode='lines', line=dict(color='rgba(123,104,238,0.8)', width=2), showlegend=False))
+            
+            # AI Mean Pin
+            fig_stoch.add_trace(go.Scatter(x=[eb, eb], y=[0, max(y_vals)], mode="lines", line=dict(color="#7b68ee", width=2, dash="dot"), showlegend=False))
+            fig_stoch.add_trace(go.Scatter(x=[eb], y=[max(y_vals)*1.05], mode="text", text=["AI Mean"], textfont=dict(color="#7b68ee"), showlegend=False))
+            
+            # Actual Audited Burn Pin
+            actual_color = "#00e0b0" if (tr['Daily_Burn'] >= tr['Exp_Lower'] and tr['Daily_Burn'] <= tr['Exp_Upper']) else "#e63946"
+            y_actual = np.exp(-0.5 * ((tr['Daily_Burn'] - eb) / sigma)**2) / (sigma * np.sqrt(2 * np.pi))
+            fig_stoch.add_trace(go.Scatter(x=[tr['Daily_Burn'], tr['Daily_Burn']], y=[0, y_actual], mode="lines", line=dict(color=actual_color, width=2), showlegend=False))
+            fig_stoch.add_trace(go.Scatter(x=[tr['Daily_Burn']], y=[y_actual + max(y_vals)*0.08], mode="markers+text", marker=dict(color=actual_color, size=12, symbol="diamond"), text=["Actual"], textfont=dict(color=actual_color, weight="bold"), textposition="top center", showlegend=False))
+            
+            fig_stoch.update_layout(title=dict(text="Stochastic Factor (Conformal Probability Density)", font=dict(size=13, color='#fff')), height=250, yaxis=dict(showticklabels=False, showgrid=False, zeroline=False), xaxis=dict(title="MT/day", gridcolor='rgba(201,168,76,0.04)'), paper_bgcolor='rgba(0,0,0,0)', plot_bgcolor='rgba(0,0,0,0)', font_color="#dce8f0", margin=dict(t=40, b=30, l=0, r=0))
             st.plotly_chart(fig_stoch, use_container_width=True, config={'displayModeBar':False})
             
             st.info(f"**Forensic Translation:** Expected Mathematical Mean: **{eb:.1f} MT/d**. Accounting for unmeasured stochastic variance (noise), the true burn should fall between **{tr['Exp_Lower']:.1f} and {tr['Exp_Upper']:.1f} MT/d**. Physically Audited Burn: **{tr['Daily_Burn']:.1f} MT/d**.")
