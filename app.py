@@ -130,12 +130,12 @@ def compute_dqi(r1, r2, days, phys_burn, drift, ghost_tol):
 # ═══════════════════════════════════════════════════════════════════════════════
 # SEMANTIC INGESTION & SCHEMA ENFORCEMENT
 # ═══════════════════════════════════════════════════════════════════════════════
-def semantic_parse(uploaded_file):
-    vn_raw = re.sub(r'\.[^.]+$', '', uploaded_file.name).strip()
+def semantic_parse(file_bytes, file_name):
+    vn_raw = re.sub(r'\.[^.]+$', '', file_name).strip()
     vname = re.sub(r'[_\-]+', ' ', vn_raw).upper()
     
-    if uploaded_file.name.lower().endswith('.xlsx'): df_raw = pd.read_excel(uploaded_file, header=None, engine='openpyxl')
-    else: df_raw = pd.read_csv(io.StringIO(uploaded_file.getvalue().decode('latin-1', errors='replace')), header=None, on_bad_lines='skip')
+    if file_name.lower().endswith('.xlsx'): df_raw = pd.read_excel(io.BytesIO(file_bytes), header=None, engine='openpyxl')
+    else: df_raw = pd.read_csv(io.StringIO(file_bytes.decode('latin-1', errors='replace')), header=None, on_bad_lines='skip')
         
     if df_raw.empty or len(df_raw) < 4: raise ValueError("File is empty or severely malformed.")
 
@@ -396,18 +396,12 @@ def execute_ai_physics(trip_df, min_speed):
 # PIPELINE ORCHESTRATOR (CACHED FOR MAXIMUM SPEED)
 # ═══════════════════════════════════════════════════════════════════════════════
 @st.cache_data(show_spinner=False)
-def run_pipeline(uploaded_file_bytes, filename, min_speed, ghost_sea, ghost_port):
+def run_pipeline(file_bytes, filename, min_speed, ghost_sea, ghost_port):
     """
-    By passing raw bytes to the cached function instead of the Streamlit UploadedFile object,
-    and passing the dynamic thresholds, we ensure this entire math pipeline only runs ONCE per file drop.
+    Pass raw bytes natively to avoid wrapper crashes while retaining Streamlit caching speed.
     """
     try:
-        class DummyFile:
-            def __init__(self, b, n): self.b, self.name = b, n
-            def getvalue(self): return self.b
-        
-        dummy = DummyFile(uploaded_file_bytes, filename)
-        parsed_df, vname = semantic_parse(dummy)
+        parsed_df, vname = semantic_parse(file_bytes, filename)
         trip_df, cum_drift = build_state_machine(parsed_df, min_speed, ghost_sea, ghost_port)
         trip_df, ai_msg = execute_ai_physics(trip_df, min_speed)
         
@@ -485,13 +479,11 @@ for f in files:
     with st.spinner(f'Auditing {f.name}...'):
         file_bytes = f.getvalue()
         
-        # We pre-parse just to get the name for the Fleet Database lookup
         try:
-            class DummyFile:
-                def __init__(self, b, n): self.b, self.name = b, n
-                def getvalue(self): return self.b
-            _, vname = semantic_parse(DummyFile(file_bytes, f.name))
+            # 1. Semantic Parse native bytes to get Vessel Name
+            _, vname = semantic_parse(file_bytes, f.name)
             
+            # 2. Fleet Master Dynamic Lookup
             if vname in fleet_db.index:
                 v_props = fleet_db.loc[vname]
                 min_speed = float(v_props.get('Min_Speed_kn', 4.0))
@@ -500,7 +492,7 @@ for f in files:
             else:
                 min_speed, ghost_sea, ghost_port = 4.0, -3.0, -5.0
                 
-            # Execute Cached Pipeline (Massive Speed Increase)
+            # 3. Execute Cached Pipeline (Massive Speed Increase)
             trip_df, sum_data, cum_drift, err = run_pipeline(file_bytes, f.name, min_speed, ghost_sea, ghost_port)
             
         except Exception as e:
