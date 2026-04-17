@@ -325,9 +325,8 @@ def execute_ai_physics(trip_df, min_speed):
         ml[features] = ml[features].fillna(0.0)
         
         # --- THE PURE DATA-DRIVEN PIML ANCHOR ---
-        # We calculate the total physical efficiency (Hull + Engine) mathematically, completely ignoring shipyard SFOC
         k_array = ml['Daily_Burn'] / ((ml['True_Mass']**(2/3)) * ml['Speed_Cubed'] + 1e-6)
-        best_k = np.percentile(k_array, 5) # Finding the most efficient historic floor
+        best_k = np.percentile(k_array, 5)
         ml['HM_Base'] = best_k * (ml['True_Mass']**(2/3)) * ml['Speed_Cubed']
         trip_df.loc[sea_mask, 'HM_Base'] = ml['HM_Base']
         
@@ -368,7 +367,7 @@ def execute_ai_physics(trip_df, min_speed):
         trip_df.loc[sea_mask, 'Mahalanobis'] = md
         trip_df.loc[sea_mask, 'MD_Threshold'] = np.percentile(md, 95)
         
-        # SHAP Explanations (Explaining the Delta)
+        # SHAP Explanations
         explainer = shap.TreeExplainer(model)
         sv = explainer.shap_values(X_train)
         base_val = explainer.expected_value[0] if isinstance(explainer.expected_value, np.ndarray) else explainer.expected_value
@@ -380,7 +379,7 @@ def execute_ai_physics(trip_df, min_speed):
         trip_df.loc[sea_mask, 'SHAP_Mass'] = sv[:,2]
         trip_df.loc[sea_mask, 'SHAP_Kinematics'] = sv[:,3] + sv[:,4] 
         trip_df.loc[sea_mask, 'SHAP_Season'] = sv[:,5]
-        trip_df.loc[sea_mask, 'SHAP_Degradation'] = sv[:,6] # Time Proxy
+        trip_df.loc[sea_mask, 'SHAP_Degradation'] = sv[:,6] 
         trip_df.loc[sea_mask, 'Exp_Lower'] = preds - stoch_margin
         trip_df.loc[sea_mask, 'Exp_Upper'] = preds + stoch_margin
         
@@ -598,7 +597,11 @@ for f in files:
             fig_md.update_layout(paper_bgcolor='rgba(0,0,0,0)', plot_bgcolor='rgba(0,0,0,0)', height=180, font_color="#dce8f0", margin=dict(t=40, b=20, l=30, r=30))
             st.plotly_chart(fig_md, use_container_width=True, config={'displayModeBar':False})
             
-            if md_val > md_thresh: st.error("⚠️ **Fabrication Warning:** Even if the Fuel Burn is statistically normal, the inputted combination of Speed, Mass, Weather, and Time represents a 7-dimensional mathematical impossibility compared to historical data structure.")
+            # --- 4. NEUTRAL ANALYTICAL TEXT (Pass / Fail) ---
+            if md_val <= md_thresh:
+                st.success(f"**Kinematic Audit: PASS.** The engine confirms this report because the combination of speed, mass, and weather generates a Mahalanobis distance ({md_val:.1f}) within the historical threshold ({md_thresh:.1f}). This mathematically verifies the physical inputs as statistically normal for this vessel's established baseline.")
+            else:
+                st.error(f"⚠️ **Kinematic Audit: FAIL.** The engine flagged this report because the reported combination of speed, mass, and weather generates a Mahalanobis distance ({md_val:.1f}) that represents a statistical impossibility based on historical operating data (Threshold: {md_thresh:.1f}). This mathematical contradiction proves the physical inputs were fabricated, likely to artificially justify the reported fuel burn.")
             
         else: st.warning("AI Explainability Offline: Minimum 8 Sea Legs required for exact 7D physics calculation.")
 
