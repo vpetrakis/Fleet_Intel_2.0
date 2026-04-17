@@ -177,6 +177,7 @@ def semantic_parse(uploaded_file):
     for std_name, exc_idx in cols_found.items():
         df[std_name] = df.iloc[:, exc_idx]
             
+    # Enforcement
     missing = [col for col in REQUIRED_RAW_COLS if col not in df.columns]
     for req in missing:
         if req in ['FO_A', 'FO_L', 'MGO_A', 'MGO_L', 'MELO_R', 'HSCYLO_R', 'LSCYLO_R', 'GELO_R', 'CYLO_R']: df[req] = np.nan
@@ -189,12 +190,13 @@ def semantic_parse(uploaded_file):
     return df, vname
 
 # ═══════════════════════════════════════════════════════════════════════════════
-# TRI-STATE AD-TO-AD MACHINE
+# TRI-STATE AD-TO-AD MACHINE & SMOOTHER
 # ═══════════════════════════════════════════════════════════════════════════════
 def build_state_machine(df):
     ad_events = df[df['AD'].isin(['A', 'D'])].copy()
     if len(ad_events) < 2: raise ValueError("Insufficient A/D events to construct a timeline.")
     
+    # Event Aggregator / Sequence Smoother
     ad_events['Prev_AD'] = ad_events['AD'].shift(1)
     ad_events = ad_events[ad_events['AD'] != ad_events['Prev_AD']].drop(columns=['Prev_AD']).copy()
     
@@ -207,6 +209,7 @@ def build_state_machine(df):
         
         phase = 'SEA' if r1['AD'] == 'D' else 'PORT'
         
+        # Time Fallback
         days = (r2['Datetime'] - r1['Datetime']).total_seconds() / 86400.0
         if days <= 0: 
             days = 0.02 
@@ -287,19 +290,19 @@ def build_state_machine(df):
     return trip_df, cum_drift
 
 # ═══════════════════════════════════════════════════════════════════════════════
-# FULL MATHEMATICAL PHYSICS (PIML + CONFORMAL + MAHALANOBIS)
+# EXACT CONFORMAL PREDICTION (AI PHYSICS)
 # ═══════════════════════════════════════════════════════════════════════════════
 def execute_ai_physics(trip_df):
-    ai_status_msg = "Enterprise AI Optimized."
+    ai_status_msg = "AI Optimized."
     if not HAS_ML: return trip_df, "AI Offline: xgboost/shap libraries not installed."
     if trip_df.empty: return trip_df, "AI Offline: Empty ledger."
     
-    for col in ['AI_Exp', 'HM_Base', 'Stoch_Var', 'SHAP_Base', 'SHAP_Propulsion', 'SHAP_Mass', 'SHAP_Kinematics', 'SHAP_Season', 'Exp_Lower', 'Exp_Upper', 'Mahalanobis', 'MD_Threshold']:
+    for col in ['AI_Exp', 'Stoch_Var', 'SHAP_Base', 'SHAP_Propulsion', 'SHAP_Mass', 'SHAP_Kinematics', 'SHAP_Season', 'Exp_Lower', 'Exp_Upper']:
         if col not in trip_df.columns: trip_df[col] = np.nan
         
     try:
         sea_mask = (trip_df['Phase'] == 'SEA') & (trip_df['Status'] == 'VERIFIED') & (trip_df['Speed_kn'] > MIN_SEA_SPEED_KN)
-        if sea_mask.sum() < 7: raise ValueError(f"Insufficient valid Sea Legs ({sea_mask.sum()}). Minimum 7 required for Covariance Matrix.")
+        if sea_mask.sum() < 4: raise ValueError(f"Insufficient valid Sea Legs ({sea_mask.sum()}). Minimum 4 required.")
             
         ml = trip_df.loc[sea_mask].copy()
         ml['True_Mass'] = ml['CargoQty'].fillna(0) + ml['FO_A_Start'].fillna(0)
@@ -311,26 +314,15 @@ def execute_ai_physics(trip_df):
         
         features = ['Speed_kn', 'Speed_Cubed', 'True_Mass', 'Kin_Delta', 'Accel_Penalty', 'Season_Sin']
         ml[features] = ml[features].fillna(0.0)
+        X_train, y_train, weights = ml[features], ml['Daily_Burn'], ml['Days'].clip(0.1, 30.0)
         
-        # --- THE PIML ANCHOR ---
-        # Find the top 5% most efficient historical days to reverse-engineer the Admiralty Constant (k)
-        k_array = ml['Daily_Burn'] / ((ml['True_Mass']**(2/3)) * ml['Speed_Cubed'] + 1e-6)
-        best_k = np.percentile(k_array, 5)
-        ml['HM_Base'] = best_k * (ml['True_Mass']**(2/3)) * ml['Speed_Cubed']
-        trip_df.loc[sea_mask, 'HM_Base'] = ml['HM_Base']
-        
-        # We only train the AI to predict the unexplained delta
-        y_delta = ml['Daily_Burn'] - ml['HM_Base']
-        X_train, weights = ml[features], ml['Days'].clip(0.1, 30.0)
-        
-        if y_delta.var() < 0.05: raise ValueError("Target variance too low.")
+        if y_train.var() < 0.1: raise ValueError("Target variance too low. Vessel burning identical fuel daily.")
 
-        # 1. Train Delta Model
+        # 1. Mean Deterministic Model
         model = XGBRegressor(n_estimators=100, max_depth=3, learning_rate=0.06, random_state=42)
-        model.fit(X_train, y_delta, sample_weight=weights)
-        train_preds_delta = model.predict(X_train)
-        preds = ml['HM_Base'] + train_preds_delta
-        residuals = np.abs(ml['Daily_Burn'] - preds)
+        model.fit(X_train, y_train, sample_weight=weights)
+        train_preds = model.predict(X_train)
+        residuals = np.abs(y_train - train_preds)
         
         # 2. True Heteroscedastic Variance Model
         var_model = XGBRegressor(n_estimators=40, max_depth=2, learning_rate=0.05, random_state=42)
@@ -341,23 +333,16 @@ def execute_ai_physics(trip_df):
         conformal_scores = residuals / var_preds_train
         
         n = len(conformal_scores)
-        q_val = min(1.0, np.ceil((n + 1) * 0.90) / n) if n > 0 else 0.90
-        q90 = np.quantile(conformal_scores, q_val)
+        if n > 0:
+            q_val = min(1.0, np.ceil((n + 1) * 0.90) / n)
+            q90 = np.quantile(conformal_scores, q_val)
+        else:
+            q90 = 1.645
             
+        preds = model.predict(X_train)
         stoch_margin = np.maximum(var_model.predict(X_train) * q90, 0.5) 
         
-        # --- MULTI-DIMENSIONAL MAHALANOBIS ---
-        X_mat = X_train.values
-        mu = np.mean(X_mat, axis=0)
-        cov = np.cov(X_mat, rowvar=False)
-        cov += np.eye(cov.shape[0]) * 1e-6 # Stability constraint
-        inv_cov = np.linalg.inv(cov)
-        diff = X_mat - mu
-        md = np.sqrt(np.sum(np.dot(diff, inv_cov) * diff, axis=1))
-        trip_df.loc[sea_mask, 'Mahalanobis'] = md
-        trip_df.loc[sea_mask, 'MD_Threshold'] = np.percentile(md, 95)
-        
-        # SHAP Explanations (Explaining the Delta)
+        # SHAP Explanations
         explainer = shap.TreeExplainer(model)
         sv = explainer.shap_values(X_train)
         base_val = explainer.expected_value[0] if isinstance(explainer.expected_value, np.ndarray) else explainer.expected_value
@@ -452,12 +437,12 @@ def chart_cum_drift(cum_drift):
 # ═══════════════════════════════════════════════════════════════════════════════
 # MAIN FRONTEND EXECUTION
 # ═══════════════════════════════════════════════════════════════════════════════
-st.markdown(f"""<div class="hero"><div class="hero-left"><img src="data:image/svg+xml;base64,{LOGO_SVG}" class="hero-logo" alt=""/><div><div class="hero-title">POSEIDON TITAN</div><div class="hero-sub">Enterprise Forensic Engine</div></div></div><div class="hero-badge"><span>KERNEL</span>&ensp;PIML & Mahalanobis Math<br><span>PIPELINE</span>&ensp;True Conformal PDF<br><span>BUILD</span>&ensp;v40.0 Masterpiece</div></div>""",unsafe_allow_html=True)
+st.markdown(f"""<div class="hero"><div class="hero-left"><img src="data:image/svg+xml;base64,{LOGO_SVG}" class="hero-logo" alt=""/><div><div class="hero-title">POSEIDON TITAN</div><div class="hero-sub">Enterprise Forensic Engine</div></div></div><div class="hero-badge"><span>KERNEL</span>&ensp;Smoothed State Machine<br><span>PIPELINE</span>&ensp;True Conformal Math<br><span>BUILD</span>&ensp;v30.0 Masterpiece</div></div>""",unsafe_allow_html=True)
 
 files = st.file_uploader('Upload vessel telemetry', accept_multiple_files=True, type=['xlsx','csv'], label_visibility='collapsed')
 
 if not files:
-    st.info("Drop vessel noon-report files to execute the Multi-Dimensional Forensic Audit.")
+    st.info("Drop vessel noon-report files to execute the Zero-Tolerance State Machine & Conformal AI.")
     st.stop()
 
 fleet_results = []
@@ -483,7 +468,7 @@ for f in files:
     cols[4].metric('Mass Anomalies', f"{sum_data['anomalies']}")
     cols[5].metric('Quarantined Legs', f"{sum_data['quarantined']}")
 
-    t1, t2, t3, t4, t5, t6 = st.tabs(['IMMUTABLE LEDGER', 'COMMERCIAL P&L', 'LUBE & DRIFT', 'AI DIGITAL TWIN', 'FORENSIC PROOF', 'QUARANTINE LOG'])
+    t1, t2, t3, t4, t5, t6 = st.tabs(['IMMUTABLE LEDGER', 'COMMERCIAL P&L', 'LUBE & DRIFT', 'AI DIGITAL TWIN', 'SHAP EXPLAINER', 'QUARANTINE LOG'])
 
     with t1:
         st.markdown('<span style="font-family:var(--fm); font-size:0.7rem; color:var(--acc)">[START ROB] + [BUNKERS] - [END ROB] = [PHYSICAL BURN]</span>', unsafe_allow_html=True)
@@ -520,18 +505,17 @@ for f in files:
 
     with t5:
         sea = df[(df['Phase'] == 'SEA') & (df['Status'] == 'VERIFIED')]
-        if 'HM_Base' in sea.columns and sea['HM_Base'].abs().sum() > 0:
+        if 'SHAP_Base' in sea.columns and sea['SHAP_Base'].abs().sum() > 0:
             options = sea['Timeline'].tolist()
             sel = st.selectbox('Select Verified Sea Passage', options, key=f'shap_{sum_data["vname"]}')
             tr = sea[sea['Timeline']==sel].iloc[0]
+            eb = tr['SHAP_Base'] + tr['SHAP_Propulsion'] + tr['SHAP_Mass'] + tr['SHAP_Kinematics'] + tr['SHAP_Season']
             
-            # --- 1. THE PIML WATERFALL ---
-            eb = tr['AI_Exp']
-            fig_w = go.Figure(go.Waterfall(name="SHAP", orientation="v", measure=["absolute","relative","relative","relative","relative","relative","total"], x=["Admiralty Physics Base", "Fleet Delta Bias", "Residual Speed", "Mass Delta", "Kinematics", "Season", "Expected Mean"], textposition="outside", text=[f"{tr['HM_Base']:.1f}", f"{tr['SHAP_Base']:+.1f}", f"{tr['SHAP_Propulsion']:+.1f}", f"{tr['SHAP_Mass']:+.1f}", f"{tr['SHAP_Kinematics']:+.1f}", f"{tr['SHAP_Season']:+.1f}", f"{eb:.1f}"], y=[tr['HM_Base'], tr['SHAP_Base'], tr['SHAP_Propulsion'], tr['SHAP_Mass'], tr['SHAP_Kinematics'], tr['SHAP_Season'], 0], connector={"line":{"color":"rgba(201,168,76,0.15)"}}, decreasing={"marker":{"color":"#00e0b0"}}, increasing={"marker":{"color":"#e63946"}}, totals={"marker":{"color":"#7b68ee"}}))
-            fig_w.update_layout(paper_bgcolor='rgba(0,0,0,0)', plot_bgcolor='rgba(0,0,0,0)', height=300, title=dict(text=f"Mathematical Delta Breakdown: {tr['Route']} ({tr['Speed_kn']}kn)", font=dict(color='#fff')), yaxis=dict(gridcolor='rgba(201,168,76,0.04)'), margin=dict(t=40,b=20,l=0,r=0))
+            fig_w = go.Figure(go.Waterfall(name="SHAP", orientation="v", measure=["absolute","relative","relative","relative","relative","total"], x=["Baseline", "Propulsion", "True Mass", "Kinematics", "Season", "Expected Mean"], textposition="outside", text=[f"{tr['SHAP_Base']:.1f}", f"{tr['SHAP_Propulsion']:+.1f}", f"{tr['SHAP_Mass']:+.1f}", f"{tr['SHAP_Kinematics']:+.1f}", f"{tr['SHAP_Season']:+.1f}", f"{eb:.1f}"], y=[tr['SHAP_Base'], tr['SHAP_Propulsion'], tr['SHAP_Mass'], tr['SHAP_Kinematics'], tr['SHAP_Season'], 0], connector={"line":{"color":"rgba(201,168,76,0.15)"}}, decreasing={"marker":{"color":"#00e0b0"}}, increasing={"marker":{"color":"#e63946"}}, totals={"marker":{"color":"#7b68ee"}}))
+            fig_w.update_layout(paper_bgcolor='rgba(0,0,0,0)', plot_bgcolor='rgba(0,0,0,0)', height=350, title=dict(text=f"SHAP Deterministic Breakdown: {tr['Route']} ({tr['Speed_kn']}kn)", font=dict(color='#fff')), yaxis=dict(gridcolor='rgba(201,168,76,0.04)'), margin=dict(t=40,b=20,l=0,r=0))
             st.plotly_chart(fig_w, use_container_width=True, config={'displayModeBar':False})
             
-            # --- 2. THE STOCHASTIC PDF (P-VALUE INTEGRAL) ---
+            # --- THE NEW PROBABILITY DENSITY STOCHASTIC GRAPH ---
             sigma = max(tr['Stoch_Var'] / 1.645, 0.1) 
             x_vals = np.linspace(eb - 4*sigma, eb + 4*sigma, 200)
             y_vals = np.exp(-0.5 * ((x_vals - eb) / sigma)**2) / (sigma * np.sqrt(2 * np.pi))
@@ -540,46 +524,26 @@ for f in files:
             y_fill = np.exp(-0.5 * ((x_fill - eb) / sigma)**2) / (sigma * np.sqrt(2 * np.pi))
             
             fig_stoch = go.Figure()
+            # 90% Conformal Fill Area
             fig_stoch.add_trace(go.Scatter(x=np.concatenate([x_fill, x_fill[::-1]]), y=np.concatenate([y_fill, np.zeros_like(y_fill)]), fill='toself', fillcolor='rgba(123,104,238,0.2)', line=dict(color='rgba(255,255,255,0)'), hoverinfo='skip', showlegend=False))
+            # Full Bell Curve Line
             fig_stoch.add_trace(go.Scatter(x=x_vals, y=y_vals, mode='lines', line=dict(color='rgba(123,104,238,0.8)', width=2), showlegend=False))
+            
+            # AI Mean Pin
             fig_stoch.add_trace(go.Scatter(x=[eb, eb], y=[0, max(y_vals)], mode="lines", line=dict(color="#7b68ee", width=2, dash="dot"), showlegend=False))
             fig_stoch.add_trace(go.Scatter(x=[eb], y=[max(y_vals)*1.05], mode="text", text=["AI Mean"], textfont=dict(color="#7b68ee"), showlegend=False))
             
+            # Actual Audited Burn Pin
             actual_color = "#00e0b0" if (tr['Daily_Burn'] >= tr['Exp_Lower'] and tr['Daily_Burn'] <= tr['Exp_Upper']) else "#e63946"
             y_actual = np.exp(-0.5 * ((tr['Daily_Burn'] - eb) / sigma)**2) / (sigma * np.sqrt(2 * np.pi))
             fig_stoch.add_trace(go.Scatter(x=[tr['Daily_Burn'], tr['Daily_Burn']], y=[0, y_actual], mode="lines", line=dict(color=actual_color, width=2), showlegend=False))
             fig_stoch.add_trace(go.Scatter(x=[tr['Daily_Burn']], y=[y_actual + max(y_vals)*0.08], mode="markers+text", marker=dict(color=actual_color, size=12, symbol="diamond"), text=["Actual"], textfont=dict(color=actual_color, weight="bold"), textposition="top center", showlegend=False))
             
-            fig_stoch.update_layout(title=dict(text="Conformal Probability Density", font=dict(size=13, color='#fff')), height=200, yaxis=dict(showticklabels=False, showgrid=False, zeroline=False), xaxis=dict(title="MT/day", gridcolor='rgba(201,168,76,0.04)'), paper_bgcolor='rgba(0,0,0,0)', plot_bgcolor='rgba(0,0,0,0)', font_color="#dce8f0", margin=dict(t=40, b=30, l=0, r=0))
+            fig_stoch.update_layout(title=dict(text="Stochastic Factor (Conformal Probability Density)", font=dict(size=13, color='#fff')), height=250, yaxis=dict(showticklabels=False, showgrid=False, zeroline=False), xaxis=dict(title="MT/day", gridcolor='rgba(201,168,76,0.04)'), paper_bgcolor='rgba(0,0,0,0)', plot_bgcolor='rgba(0,0,0,0)', font_color="#dce8f0", margin=dict(t=40, b=30, l=0, r=0))
             st.plotly_chart(fig_stoch, use_container_width=True, config={'displayModeBar':False})
             
-            # P-Value Calculus
-            z_score = abs(tr['Daily_Burn'] - eb) / sigma
-            p_val = (1.0 - math.erf(z_score / math.sqrt(2))) * 100
-            if p_val < 5.0: st.error(f"**Forensic Proof:** The Audited Burn falls at the absolute tail of the Conformal distribution. Probability of natural occurrence: **{p_val:.2f}%**. High probability of physical anomaly or mass extraction.")
-            else: st.success(f"**Forensic Proof:** The Audited Burn is statistically nominal. Probability of natural occurrence: **{p_val:.2f}%**.")
-            
-            # --- 3. MAHALANOBIS KINEMATIC PLAUSIBILITY GAUGE ---
-            md_val = tr['Mahalanobis']
-            md_thresh = tr['MD_Threshold']
-            md_color = "#00e0b0" if md_val <= md_thresh else "#e63946"
-            
-            fig_md = go.Figure(go.Indicator(
-                mode="number+gauge", value=md_val, number={'font':{'color': md_color, 'size':30}},
-                domain={'x': [0, 1], 'y': [0, 1]}, title={'text': "Kinematic Plausibility (Mahalanobis Distance)", 'font': {'size': 13, 'color':'#fff'}},
-                gauge={
-                    'axis': {'range': [None, max(md_val, md_thresh)*1.2], 'tickwidth': 1, 'tickcolor': "rgba(255,255,255,0.2)"},
-                    'bar': {'color': md_color},
-                    'bgcolor': "rgba(201,168,76,0.04)", 'borderwidth': 0,
-                    'steps': [{'range': [0, md_thresh], 'color': "rgba(0,224,176,0.1)"}, {'range': [md_thresh, max(md_val, md_thresh)*1.2], 'color': "rgba(230,57,70,0.1)"}],
-                    'threshold': {'line': {'color': "white", 'width': 2}, 'thickness': 0.75, 'value': md_thresh}
-                }))
-            fig_md.update_layout(paper_bgcolor='rgba(0,0,0,0)', plot_bgcolor='rgba(0,0,0,0)', height=180, font_color="#dce8f0", margin=dict(t=40, b=20, l=30, r=30))
-            st.plotly_chart(fig_md, use_container_width=True, config={'displayModeBar':False})
-            
-            if md_val > md_thresh: st.error("⚠️ **Fabrication Warning:** Even if the Fuel Burn is statistically normal, the inputted combination of Speed, Mass, and Weather represents a multi-dimensional mathematical impossibility compared to historical data structure.")
-            
-        else: st.warning("AI Explainability Offline: Minimum 7 Sea Legs required for exact physics calculation.")
+            st.info(f"**Forensic Translation:** Expected Mathematical Mean: **{eb:.1f} MT/d**. Accounting for unmeasured stochastic variance (noise), the true burn should fall between **{tr['Exp_Lower']:.1f} and {tr['Exp_Upper']:.1f} MT/d**. Physically Audited Burn: **{tr['Daily_Burn']:.1f} MT/d**.")
+        else: st.warning("AI Explainability Offline: See header logs.")
 
     with t6:
         quar = df[df['Status'].str.contains('QUARANTINE|GHOST')]
